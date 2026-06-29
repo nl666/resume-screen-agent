@@ -10,6 +10,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from resume_screen_agent.rag import (
     EMBEDDING_MODEL_NAME,
+    answer_with_context,
     build_vector_index,
     chunk_text,
     load_documents,
@@ -17,6 +18,17 @@ from resume_screen_agent.rag import (
     retrieve,
     retrieve_vector,
 )
+
+
+class FakeChatModel:
+    def __init__(self) -> None:
+        self.prompts: list[tuple[str, str]] = []
+
+    def complete_json(self, system_prompt: str, user_prompt: str) -> str:
+        self.prompts.append((system_prompt, user_prompt))
+        if "不查询知识库" in system_prompt or "自由回答" in user_prompt:
+            return '{"answer":"这是模型自由回答。","sources":[],"confidence":"medium"}'
+        return '{"answer":"这是基于资料的回答。","sources":[{"file":"rag.md","chunk_id":"rag.md#0","quote":"RAG 链路"}],"confidence":"high"}'
 
 
 class RagTests(unittest.TestCase):
@@ -89,6 +101,27 @@ class RagTests(unittest.TestCase):
             self.assertEqual(payload["embedding"]["model"], EMBEDDING_MODEL_NAME)
             self.assertEqual(result["sources"][0]["file"], "rag.md")
             self.assertEqual(result["retrieval"]["mode"], "vector")
+
+    def test_answer_with_context_supports_mixed_mode_prompt(self) -> None:
+        model = FakeChatModel()
+        chunks = [next(iter(chunk_text([{"source": "rag.md", "text": "RAG 链路包含 Chunk 和 Embedding。"}], min_chars=10, max_chars=120)))]
+
+        result = answer_with_context("RAG 是什么？", chunks, model=model, answer_mode="mixed")
+
+        self.assertEqual(result["confidence"], "high")
+        self.assertIn("混合增强模式", model.prompts[0][0])
+
+    def test_query_knowledge_base_free_mode_skips_retrieval(self) -> None:
+        result = query_knowledge_base(
+            "如何优化 Agent 项目？",
+            use_llm=True,
+            answer_mode="free",
+            model=FakeChatModel(),
+        )
+
+        self.assertEqual(result["sources"], [])
+        self.assertEqual(result["retrieval"]["answer_mode"], "free")
+        self.assertEqual(result["retrieval"]["mode"], "none")
 
 
 if __name__ == "__main__":

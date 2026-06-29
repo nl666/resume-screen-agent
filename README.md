@@ -163,13 +163,26 @@ python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --retr
 python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --vector-store chroma --retrieval-only
 ```
 
+三种回答模式：
+
+```bash
+# 严格根据知识库回答：先检索资料，再要求 LLM 只根据资料回答
+python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --answer-mode strict
+
+# 知识库 + 模型补充：先给知识库依据，再允许模型补充通用建议
+python scripts/rag_qa.py --question "这个 Agent 项目还能怎么优化？" --answer-mode mixed
+
+# 模型自由回答：不查询知识库，直接让 LLM 根据通用能力回答
+python scripts/rag_qa.py --question "AI Agent 学习路线怎么安排？" --answer-mode free
+```
+
 输出包含：
 
 ```text
 answer：基于知识库的回答
 sources：来源文件、chunk_id、引用片段
 confidence：high / medium / low
-retrieval：检索方式、向量模型、索引路径、知识片段数量
+retrieval：回答模式、检索方式、向量模型、索引路径、知识片段数量
 ```
 
 说明：

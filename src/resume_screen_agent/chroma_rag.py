@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Any
 
 from .llm import ChatModel
-from .rag import Chunk, DEFAULT_KNOWLEDGE_DIR, answer_with_context, chunk_text, load_documents
+from .rag import (
+    Chunk,
+    DEFAULT_KNOWLEDGE_DIR,
+    answer_freely,
+    answer_with_context,
+    chunk_text,
+    load_documents,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,12 +93,26 @@ def query_chroma_knowledge_base(
     top_k: int = 5,
     use_llm: bool = False,
     model: ChatModel | None = None,
+    answer_mode: str = "retrieval",
     persist_dir: str | Path = DEFAULT_CHROMA_DIR,
     collection_name: str = DEFAULT_CHROMA_COLLECTION,
     model_name: str = DEFAULT_BGE_MODEL,
     rebuild_index: bool = False,
 ) -> dict[str, Any]:
     """Query local Chroma using BGE embeddings and return cited chunks."""
+    if answer_mode == "free":
+        payload = answer_freely(question, model=model)
+        payload["retrieval"] = {
+            "mode": "none",
+            "vector_store": "none",
+            "answer_mode": "free",
+            "embedding_model": None,
+            "persist_dir": None,
+            "collection": None,
+            "chunk_count": 0,
+        }
+        return payload
+
     result = retrieve_chroma(
         question=question,
         knowledge_dir=knowledge_dir,
@@ -102,8 +123,13 @@ def query_chroma_knowledge_base(
         rebuild_index=rebuild_index,
     )
 
-    if use_llm:
-        payload = answer_with_context(question, result.chunks, model=model)
+    if answer_mode in {"strict", "mixed"}:
+        payload = answer_with_context(
+            question,
+            result.chunks,
+            model=model,
+            answer_mode=answer_mode,
+        )
     else:
         payload = {
             "answer": f"已通过 BGE + Chroma 本地向量库检索到 {len(result.sources)} 个相关知识片段。打开“生成完整回答”后，可基于这些片段生成自然语言答案。",
@@ -114,6 +140,7 @@ def query_chroma_knowledge_base(
     payload["retrieval"] = {
         "mode": "vector",
         "vector_store": "chroma",
+        "answer_mode": answer_mode,
         "embedding_model": result.model_name,
         "persist_dir": str(result.persist_dir),
         "collection": result.collection_name,

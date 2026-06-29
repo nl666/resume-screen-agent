@@ -25,6 +25,7 @@ EMBEDDING_DIMENSIONS = 512
 _VALID_CONFIDENCE = {"high", "medium", "low"}
 _VALID_RETRIEVAL_MODES = {"keyword", "vector", "hybrid"}
 _VALID_VECTOR_STORES = {"local", "chroma"}
+_VALID_ANSWER_MODES = {"strict", "mixed", "free", "retrieval"}
 
 SparseVector = dict[int, float]
 
@@ -450,6 +451,15 @@ def _normalize_vector_store(vector_store: str) -> str:
     return normalized
 
 
+def _normalize_answer_mode(answer_mode: str | None, use_llm: bool) -> str:
+    if not answer_mode:
+        return "strict" if use_llm else "retrieval"
+    normalized = str(answer_mode).strip().lower()
+    if normalized not in _VALID_ANSWER_MODES:
+        return "strict" if use_llm else "retrieval"
+    return normalized
+
+
 def query_knowledge_base(
     question: str,
     knowledge_dir: str | Path = DEFAULT_KNOWLEDGE_DIR,
@@ -458,6 +468,7 @@ def query_knowledge_base(
     model: ChatModel | None = None,
     retrieval_mode: str = "hybrid",
     vector_store: str = "local",
+    answer_mode: str | None = None,
     index_path: str | Path | None = None,
     rebuild_index: bool = False,
     chroma_dir: str | Path | None = None,
@@ -466,6 +477,20 @@ def query_knowledge_base(
     """Query the knowledge base with vector/hybrid retrieval and citations."""
     mode = _normalize_retrieval_mode(retrieval_mode)
     store = _normalize_vector_store(vector_store)
+    normalized_answer_mode = _normalize_answer_mode(answer_mode, use_llm)
+
+    if normalized_answer_mode == "free":
+        result = answer_freely(question, model=model)
+        result["retrieval"] = {
+            "mode": "none",
+            "vector_store": "none",
+            "answer_mode": "free",
+            "embedding_model": None,
+            "embedding_dimensions": None,
+            "index_path": None,
+            "chunk_count": 0,
+        }
+        return result
 
     if store == "chroma":
         from .chroma_rag import DEFAULT_BGE_MODEL, DEFAULT_CHROMA_DIR, query_chroma_knowledge_base
@@ -476,6 +501,7 @@ def query_knowledge_base(
             top_k=top_k,
             use_llm=use_llm,
             model=model,
+            answer_mode=normalized_answer_mode,
             persist_dir=chroma_dir or DEFAULT_CHROMA_DIR,
             model_name=embedding_model or DEFAULT_BGE_MODEL,
             rebuild_index=rebuild_index,
@@ -500,25 +526,24 @@ def query_knowledge_base(
     metadata = {
         "mode": mode,
         "vector_store": "local",
+        "answer_mode": normalized_answer_mode,
         "embedding_model": EMBEDDING_MODEL_NAME if mode != "keyword" else None,
         "embedding_dimensions": EMBEDDING_DIMENSIONS if mode != "keyword" else None,
         "index_path": str(resolved_index_path) if resolved_index_path else None,
         "chunk_count": chunk_count,
     }
 
-    if use_llm:
-        result = answer_with_context(question, selected, model=model)
+    if normalized_answer_mode in {"strict", "mixed"}:
+        result = answer_with_context(
+            question,
+            selected,
+            model=model,
+            answer_mode=normalized_answer_mode,
+        )
     else:
         result = {
             "answer": f"已通过{_retrieval_mode_label(mode)}检索到 {len(selected)} 个相关知识片段。打开“生成完整回答”后，可基于这些片段生成自然语言答案。",
-            "sources": [
-                {
-                    "file": chunk.source_file,
-                    "chunk_id": chunk.chunk_id,
-                    "quote": chunk.text[:300],
-                }
-                for chunk in selected
-            ],
+            "sources": _sources_from_chunks(selected),
             "confidence": "high" if selected else "low",
         }
 
@@ -540,19 +565,33 @@ def answer_with_context(
     chunks: list[Chunk],
     model: ChatModel | None = None,
     system_prompt_path: str | Path = DEFAULT_RAG_SYSTEM_PROMPT,
+    answer_mode: str = "strict",
 ) -> dict[str, Any]:
     """Build context from *chunks*, send to the LLM, and return a structured answer.
 
     Returns a dict with keys ``answer``, ``sources``, and ``confidence``.
     """
     chat_model = model or ChatModel()
+    normalized_answer_mode = "mixed" if answer_mode == "mixed" else "strict"
 
     context_parts: list[str] = []
     for chunk in chunks:
         context_parts.append(f"[{chunk.chunk_id}]\n{chunk.text}")
     context = "\n\n---\n\n".join(context_parts)
 
-    system_prompt = Path(system_prompt_path).read_text(encoding="utf-8")
+    base_system_prompt = Path(system_prompt_path).read_text(encoding="utf-8")
+    if normalized_answer_mode == "mixed":
+        system_prompt = f"""{base_system_prompt}
+
+混合增强模式补充规则：
+1. 优先使用 context 中的信息回答。
+2. 如果需要补充通用技术解释或改进建议，可以使用模型自身知识，但必须在回答中单独标注为“模型补充”。
+3. 不要把模型补充伪装成知识库原文依据。
+4. sources 只能列出 context 中真实出现的来源。"""
+        answer_instruction = "基于知识库依据回答；如有必要，可追加“模型补充”段落，并明确标注。"
+    else:
+        system_prompt = base_system_prompt
+        answer_instruction = "只能基于知识库的回答"
 
     user_prompt = f"""context:
 {context}
@@ -562,7 +601,7 @@ question:
 
 请返回以下 JSON 格式（不要包含其他内容）：
 {{
-  "answer": "基于知识库的回答",
+  "answer": "{answer_instruction}",
   "sources": [
     {{"file": "来源文件名", "chunk_id": "chunk编号", "quote": "引用的原文片段"}}
   ],
@@ -595,3 +634,44 @@ question:
         data["sources"] = []
 
     return data
+
+
+def answer_freely(question: str, model: ChatModel | None = None) -> dict[str, Any]:
+    """Answer without knowledge-base retrieval."""
+    chat_model = model or ChatModel()
+    system_prompt = """你是 AI Agent 项目助手。你可以根据通用技术知识自由回答用户问题。
+
+规则：
+1. 不要声称回答来自项目知识库。
+2. 如果涉及本项目已有实现，请提醒用户需要以实际代码或知识库为准。
+3. 返回 JSON，不要包含 JSON 以外的内容。"""
+    user_prompt = f"""question:
+{question}
+
+请返回以下 JSON 格式（不要包含其他内容）：
+{{
+  "answer": "模型自由回答",
+  "sources": [],
+  "confidence": "high / medium / low"
+}}"""
+
+    raw = chat_model.complete_json(system_prompt, user_prompt)
+    data = extract_json_object(raw)
+    for key in ("answer", "sources", "confidence"):
+        if key not in data:
+            raise ValueError(f"Free answer response missing required key: {key}")
+    if data["confidence"] not in _VALID_CONFIDENCE:
+        data["confidence"] = "medium"
+    data["sources"] = []
+    return data
+
+
+def _sources_from_chunks(chunks: list[Chunk], quote_chars: int = 300) -> list[dict[str, str]]:
+    return [
+        {
+            "file": chunk.source_file,
+            "chunk_id": chunk.chunk_id,
+            "quote": chunk.text[:quote_chars],
+        }
+        for chunk in chunks
+    ]

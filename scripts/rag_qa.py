@@ -43,6 +43,12 @@ def main() -> None:
         help="Vector backend: local JSON index or Chroma with BGE embeddings.",
     )
     parser.add_argument(
+        "--answer-mode",
+        choices=["retrieval", "strict", "mixed", "free"],
+        default="retrieval",
+        help="Answer mode: chunks only, strict RAG, RAG plus model supplement, or free model answer.",
+    )
+    parser.add_argument(
         "--chroma-dir",
         help="Directory for the Chroma persistent database.",
     )
@@ -62,18 +68,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    answer_mode = "retrieval" if args.retrieval_only else args.answer_mode
     chat_model = None
-    if not args.retrieval_only:
+    if answer_mode in {"strict", "mixed", "free"}:
         chat_model = ChatModel(model=args.model, base_url=args.base_url)
 
     result = query_knowledge_base(
         question=args.question,
         knowledge_dir=args.knowledge_dir,
         top_k=args.top_k,
-        use_llm=not args.retrieval_only,
+        use_llm=answer_mode in {"strict", "mixed", "free"},
         model=chat_model,
         retrieval_mode=args.retrieval_mode,
         vector_store=args.vector_store,
+        answer_mode=answer_mode,
         rebuild_index=args.rebuild_index,
         chroma_dir=args.chroma_dir,
         embedding_model=args.embedding_model,

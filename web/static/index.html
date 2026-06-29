@@ -762,8 +762,16 @@
                 <option value="chroma">BGE + Chroma</option>
               </select>
             </div>
-            <label class="check-row"><input type="checkbox" name="use_llm"> 基于资料生成完整回答</label>
+            <div>
+              <label for="answerMode">回答模式</label>
+              <select id="answerMode" name="answer_mode">
+                <option value="strict" selected>严格根据知识库</option>
+                <option value="mixed">知识库 + 模型补充</option>
+                <option value="free">模型自由回答</option>
+              </select>
+            </div>
           </div>
+          <p id="answerModeHint" class="hint">严格根据知识库：只使用检索到的资料；知识库 + 模型补充：先给资料依据，再补充通用建议；模型自由回答：不查询知识库。</p>
           <button type="submit">查询知识库</button>
         </form>
       </section>
@@ -998,6 +1006,7 @@
             <h3>知识库回答</h3>
             <div class="meta">
               ${badge(`匹配度 ${confidenceLabel(result.confidence)}`)}
+              ${retrieval.answer_mode ? badge(`回答模式 ${answerModeLabel(retrieval.answer_mode)}`) : ''}
               ${retrieval.vector_store ? badge(`向量库 ${vectorStoreLabel(retrieval.vector_store)}`) : ''}
               ${retrieval.mode ? badge(`检索方式 ${retrievalModeLabel(retrieval.mode)}`) : ''}
               ${badge(`${sources.length} 条参考资料`)}
@@ -1097,7 +1106,8 @@
       const map = {
         hybrid: '向量+关键词混合',
         vector: '向量相似度',
-        keyword: '关键词匹配'
+        keyword: '关键词匹配',
+        none: '未检索'
       };
       return map[value] || value || '-';
     }
@@ -1105,7 +1115,18 @@
     function vectorStoreLabel(value) {
       const map = {
         local: '本地轻量向量索引',
-        chroma: 'BGE + Chroma'
+        chroma: 'BGE + Chroma',
+        none: '未使用'
+      };
+      return map[value] || value || '-';
+    }
+
+    function answerModeLabel(value) {
+      const map = {
+        retrieval: '仅展示检索资料',
+        strict: '严格根据知识库',
+        mixed: '知识库 + 模型补充',
+        free: '模型自由回答'
       };
       return map[value] || value || '-';
     }
@@ -1262,9 +1283,10 @@
       const payload = {
         question,
         top_k: Number(form.top_k.value),
-        use_llm: form.use_llm.checked,
+        use_llm: true,
         retrieval_mode: form.vector_store.value === 'chroma' ? 'vector' : 'hybrid',
-        vector_store: form.vector_store.value
+        vector_store: form.answer_mode.value === 'free' ? 'local' : form.vector_store.value,
+        answer_mode: form.answer_mode.value
       };
       requestJson('/api/rag-query', {
         method: 'POST',

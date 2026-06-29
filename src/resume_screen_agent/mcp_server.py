@@ -47,6 +47,12 @@ def get_mcp_tools() -> list[dict[str, Any]]:
                     "knowledge_dir": {"type": "string", "description": "Optional knowledge directory, relative to project root."},
                     "top_k": {"type": "integer", "default": 5, "minimum": 1, "maximum": 10},
                     "use_llm": {"type": "boolean", "default": False},
+                    "answer_mode": {
+                        "type": "string",
+                        "enum": ["retrieval", "strict", "mixed", "free"],
+                        "default": "retrieval",
+                        "description": "retrieval returns chunks only; strict answers only from retrieved context; mixed separates knowledge-base evidence and model supplement; free skips retrieval.",
+                    },
                     "retrieval_mode": {
                         "type": "string",
                         "enum": ["hybrid", "vector", "keyword"],
@@ -199,6 +205,7 @@ def _tool_rag_query(args: dict[str, Any]) -> dict[str, Any]:
     question = _require_str(args, "question")
     top_k = int(args.get("top_k", 5))
     use_llm = bool(args.get("use_llm", False))
+    answer_mode = str(args.get("answer_mode", "retrieval"))
     retrieval_mode = str(args.get("retrieval_mode", "hybrid"))
     vector_store = str(args.get("vector_store", "local"))
     rebuild_index = bool(args.get("rebuild_index", False))
@@ -210,6 +217,7 @@ def _tool_rag_query(args: dict[str, Any]) -> dict[str, Any]:
         knowledge_dir=knowledge_dir,
         top_k=top_k,
         use_llm=use_llm,
+        answer_mode=answer_mode,
         retrieval_mode=retrieval_mode,
         vector_store=vector_store,
         rebuild_index=rebuild_index,
