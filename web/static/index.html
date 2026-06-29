@@ -285,6 +285,10 @@
       border-bottom: 1px solid var(--line);
     }
 
+    .summary-bar.is-empty {
+      display: none;
+    }
+
     .metric {
       background: var(--panel);
       padding: 15px 16px;
@@ -322,6 +326,40 @@
       min-width: 0;
       padding: 24px;
       overflow: auto;
+    }
+
+    .result-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .module-panel {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid rgba(221, 229, 238, .92);
+      border-radius: 8px;
+      background: rgba(255,255,255,.86);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .module-panel.is-empty {
+      display: none;
+    }
+
+    .module-panel .result-title {
+      margin-bottom: 12px;
+    }
+
+    .module-panel .result-title h2 {
+      font-size: 18px;
+    }
+
+    .module-panel .empty-state {
+      min-height: 132px;
+    }
+
+    .workspace-placeholder {
+      min-height: 280px;
     }
 
     .side-pane {
@@ -783,7 +821,7 @@
     </aside>
 
     <div class="workspace">
-      <div class="summary-bar">
+      <div id="summaryBar" class="summary-bar is-empty">
         <div class="metric"><span>候选人</span><strong id="metricName">-</strong></div>
         <div class="metric"><span>分数</span><strong id="metricScore">-</strong></div>
         <div class="metric"><span>等级</span><strong id="metricLevel">-</strong></div>
@@ -792,22 +830,54 @@
 
       <div id="contentShell" class="content history-collapsed">
         <div class="result-pane">
-          <div class="result-title">
-            <h2>结果</h2>
-            <span id="resultState" class="pill">idle</span>
+          <div id="workspacePlaceholder" class="empty-state workspace-placeholder">
+            <strong>等待运行</strong>
+            <span>选择左侧功能并运行后，简历筛选和知识库问答会分别显示在各自的结果区。</span>
           </div>
-          <div id="resultView" class="result-view">
-            <div class="empty-state">
-              <strong>等待运行</strong>
-              <span>上传简历、批量筛选、查询知识库或检查系统效果后，这里会显示结构化结果。</span>
-            </div>
+
+          <div class="result-stack">
+            <section id="screenResultPanel" class="module-panel is-empty" aria-live="polite">
+              <div class="result-title">
+                <h2>简历筛选结果</h2>
+                <span id="screenResultState" class="pill">未运行</span>
+              </div>
+              <div id="screenResultView" class="result-view"></div>
+              <details id="screenRawBlock" class="raw-block" hidden>
+                <summary>查看原始 JSON</summary>
+                <div class="inside">
+                  <pre id="screenOutput">{}</pre>
+                </div>
+              </details>
+            </section>
+
+            <section id="ragResultPanel" class="module-panel is-empty" aria-live="polite">
+              <div class="result-title">
+                <h2>知识库问答结果</h2>
+                <span id="ragResultState" class="pill">未运行</span>
+              </div>
+              <div id="ragResultView" class="result-view"></div>
+              <details id="ragRawBlock" class="raw-block" hidden>
+                <summary>查看原始 JSON</summary>
+                <div class="inside">
+                  <pre id="ragOutput">{}</pre>
+                </div>
+              </details>
+            </section>
+
+            <section id="evalResultPanel" class="module-panel is-empty" aria-live="polite">
+              <div class="result-title">
+                <h2>系统检查结果</h2>
+                <span id="evalResultState" class="pill">未运行</span>
+              </div>
+              <div id="evalResultView" class="result-view"></div>
+              <details id="evalRawBlock" class="raw-block" hidden>
+                <summary>查看原始 JSON</summary>
+                <div class="inside">
+                  <pre id="evalOutput">{}</pre>
+                </div>
+              </details>
+            </section>
           </div>
-          <details class="raw-block">
-            <summary>原始 JSON</summary>
-            <div class="inside">
-              <pre id="output">{}</pre>
-            </div>
-          </details>
         </div>
 
         <div id="historyPane" class="side-pane">
@@ -828,9 +898,31 @@
   </main>
 
   <script>
-    const output = document.querySelector('#output');
-    const resultView = document.querySelector('#resultView');
-    const state = document.querySelector('#resultState');
+    const summaryBar = document.querySelector('#summaryBar');
+    const workspacePlaceholder = document.querySelector('#workspacePlaceholder');
+    const moduleViews = {
+      screen: {
+        panel: document.querySelector('#screenResultPanel'),
+        view: document.querySelector('#screenResultView'),
+        state: document.querySelector('#screenResultState'),
+        raw: document.querySelector('#screenRawBlock'),
+        output: document.querySelector('#screenOutput')
+      },
+      rag: {
+        panel: document.querySelector('#ragResultPanel'),
+        view: document.querySelector('#ragResultView'),
+        state: document.querySelector('#ragResultState'),
+        raw: document.querySelector('#ragRawBlock'),
+        output: document.querySelector('#ragOutput')
+      },
+      eval: {
+        panel: document.querySelector('#evalResultPanel'),
+        view: document.querySelector('#evalResultView'),
+        state: document.querySelector('#evalResultState'),
+        raw: document.querySelector('#evalRawBlock'),
+        output: document.querySelector('#evalOutput')
+      }
+    };
     const buttons = Array.from(document.querySelectorAll('button'));
     const screenFiles = document.querySelector('#screenFiles');
     const screenHint = document.querySelector('#screenHint');
@@ -842,6 +934,8 @@
     const historyExpand = document.querySelector('#historyExpand');
     const appUrl = 'http://127.0.0.1:8000/';
 
+    let activeModule = null;
+
     function isFilePreview() {
       return location.protocol === 'file:';
     }
@@ -849,28 +943,70 @@
     function showFilePreviewWarning() {
       document.querySelector('#healthDot').classList.remove('ok');
       document.querySelector('#healthText').textContent = '需要启动服务';
-      state.textContent = 'offline';
-      state.className = 'pill bad';
-      output.textContent = '{}';
-      resultView.innerHTML = `<div class="empty-state"><strong>当前只是静态文件预览</strong><span>请先启动后端服务，然后打开 ${appUrl} 使用筛选、知识库问答和质量检查。</span></div>`;
+      showModuleMessage('screen', '当前只是静态文件预览', `请先启动后端服务，然后打开 ${appUrl} 使用筛选、知识库问答和质量检查。`, '离线', 'bad');
     }
 
-    function setBusy(value) {
+    function moduleForData(data) {
+      const result = data.result || data;
+      if (result.final_report || (data.batch_id && Array.isArray(data.items)) || (data.summary && data.items)) return 'screen';
+      if (result.answer && Array.isArray(result.sources)) return 'rag';
+      if (result.suite && result.summary) return 'eval';
+      return activeModule || 'screen';
+    }
+
+    function viewFor(module) {
+      return moduleViews[module] || moduleViews.screen;
+    }
+
+    function revealModule(module) {
+      const target = viewFor(module);
+      target.panel.classList.remove('is-empty');
+      workspacePlaceholder.hidden = true;
+      return target;
+    }
+
+    function setModuleState(module, text, tone = '') {
+      const target = viewFor(module);
+      target.state.textContent = text;
+      target.state.className = `pill ${tone}`.trim();
+    }
+
+    function writeRaw(module, value) {
+      const target = viewFor(module);
+      target.raw.hidden = false;
+      target.output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    }
+
+    function showModuleMessage(module, title, message, stateText = '提示', tone = '') {
+      const target = revealModule(module);
+      setModuleState(module, stateText, tone);
+      target.raw.hidden = true;
+      target.output.textContent = '{}';
+      target.view.innerHTML = `<div class="empty-state"><strong>${esc(title)}</strong><span>${esc(message)}</span></div>`;
+    }
+
+    function setBusy(value, module = activeModule) {
       buttons.forEach(button => button.disabled = value);
-      if (value) {
-        state.textContent = 'running';
-        state.className = 'pill';
+      if (value && module) {
+        const target = revealModule(module);
+        setModuleState(module, '运行中');
+        target.raw.hidden = true;
+        target.view.innerHTML = `<div class="empty-state"><strong>正在处理</strong><span>系统正在运行对应模块，完成后会在这里显示结果。</span></div>`;
       }
     }
 
-    function show(data) {
-      output.textContent = JSON.stringify(data, null, 2);
+    function show(data, module) {
+      const targetModule = module || moduleForData(data);
+      revealModule(targetModule);
+      writeRaw(targetModule, data);
       updateMetrics(data);
-      renderResult(data);
+      renderResult(data, targetModule);
+      setModuleState(targetModule, '完成', 'good');
       loadHistory();
     }
 
     function updateMetrics(data) {
+      summaryBar.classList.remove('is-empty');
       const result = data.result || data;
       const report = result.final_report || {};
       const summary = data.summary || result.summary || {};
@@ -897,30 +1033,31 @@
       return `<ul>${values.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
     }
 
-    function renderResult(data) {
+    function renderResult(data, module) {
       const result = data.result || data;
+      const target = viewFor(module).view;
       if (result.final_report) {
-        renderScreening(result, data.result_file || data.result_id);
+        renderScreening(result, data.result_file || data.result_id, target);
       } else if (data.batch_id && Array.isArray(data.items)) {
-        renderBatch(data);
+        renderBatch(data, target);
       } else if (result.answer && Array.isArray(result.sources)) {
-        renderRag(result);
+        renderRag(result, target);
       } else if (result.suite && result.summary) {
-        renderEval(result);
+        renderEval(result, target);
       } else if (data.summary && data.items) {
-        renderBatch(data);
+        renderBatch(data, target);
       } else {
-        resultView.innerHTML = `<div class="empty-state"><strong>结果已返回</strong><span>未识别到专用视图，可在下方查看原始 JSON。</span></div>`;
+        target.innerHTML = `<div class="empty-state"><strong>结果已返回</strong><span>未识别到专用视图，可在本面板下方查看原始 JSON。</span></div>`;
       }
     }
 
-    function renderScreening(result, fileLabel) {
+    function renderScreening(result, fileLabel, target) {
       const report = result.final_report || {};
       const evidence = asArray(report.evidence).slice(0, 10);
       const reasoning = asArray(result.reasoning_trace);
       const tools = asArray(result.tool_trace);
       const review = report.human_review_required ? '需要人工复核' : '无需强制复核';
-      resultView.innerHTML = `
+      target.innerHTML = `
         <div class="decision">
           <div>
             <h3>${esc(report.candidate_name || '候选人')}</h3>
@@ -970,9 +1107,9 @@
       `;
     }
 
-    function renderBatch(data) {
+    function renderBatch(data, target) {
       const items = asArray(data.items);
-      resultView.innerHTML = `
+      target.innerHTML = `
         <div class="decision">
           <div>
             <h3>批量筛选</h3>
@@ -997,10 +1134,10 @@
       `;
     }
 
-    function renderRag(result) {
+    function renderRag(result, target) {
       const sources = asArray(result.sources);
       const retrieval = result.retrieval || {};
-      resultView.innerHTML = `
+      target.innerHTML = `
         <div class="decision">
           <div>
             <h3>知识库回答</h3>
@@ -1026,10 +1163,10 @@
       `;
     }
 
-    function renderEval(result) {
+    function renderEval(result, target) {
       const summary = result.summary || {};
       const cases = asArray(result.cases);
-      resultView.innerHTML = `
+      target.innerHTML = `
         <div class="decision">
           <div>
             <h3>系统效果检查</h3>
@@ -1195,26 +1332,25 @@
         .replaceAll('must_have_result', '门槛结果');
     }
 
-    async function requestJson(url, options = {}) {
+    async function requestJson(url, options = {}, module = 'screen') {
+      activeModule = module;
       if (isFilePreview()) {
         showFilePreviewWarning();
         return;
       }
-      setBusy(true);
+      setBusy(true, module);
       try {
         const response = await fetch(url, options);
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || response.statusText);
-        state.textContent = 'ok';
-        state.className = 'pill good';
-        show(data);
+        show(data, module);
       } catch (error) {
-        state.textContent = 'error';
-        state.className = 'pill bad';
-        output.textContent = String(error);
-        resultView.innerHTML = `<div class="empty-state"><strong>请求失败</strong><span>${esc(error)}</span></div>`;
+        const target = revealModule(module);
+        setModuleState(module, '失败', 'bad');
+        writeRaw(module, String(error));
+        target.view.innerHTML = `<div class="empty-state"><strong>请求失败</strong><span>${esc(error)}</span></div>`;
       } finally {
-        setBusy(false);
+        setBusy(false, module);
       }
     }
 
@@ -1254,18 +1390,16 @@
 
       const files = Array.from(screenFiles.files || []);
       if (!files.length) {
-        state.textContent = 'error';
-        state.className = 'pill bad';
-        resultView.innerHTML = `<div class="empty-state"><strong>请选择文件</strong><span>先选择简历文件，再运行筛选。</span></div>`;
+        showModuleMessage('screen', '请选择文件', '先选择简历文件，再运行筛选。', '待选择', 'bad');
         return;
       }
 
       if (mode === 'single') {
         body.append('file', files[0]);
-        requestJson('/api/screen-resume', { method: 'POST', body });
+        requestJson('/api/screen-resume', { method: 'POST', body }, 'screen');
       } else {
         files.forEach(file => body.append('files', file));
-        requestJson('/api/batch-screen', { method: 'POST', body });
+        requestJson('/api/batch-screen', { method: 'POST', body }, 'screen');
       }
     });
 
@@ -1274,10 +1408,7 @@
       const form = event.currentTarget;
       const question = form.question.value.trim();
       if (!question) {
-        state.textContent = 'error';
-        state.className = 'pill bad';
-        output.textContent = '{}';
-        resultView.innerHTML = `<div class="empty-state"><strong>请输入问题</strong><span>可以询问岗位能力、评分规则、项目模块或筛选依据。</span></div>`;
+        showModuleMessage('rag', '请输入问题', '可以询问岗位能力、评分规则、项目模块或筛选依据。', '待输入', 'bad');
         return;
       }
       const payload = {
@@ -1292,7 +1423,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      });
+      }, 'rag');
     });
 
     document.querySelector('#evalButton').addEventListener('click', () => {
@@ -1300,7 +1431,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
-      });
+      }, 'eval');
     });
 
     document.querySelector('#refreshButton').addEventListener('click', loadHistory);
@@ -1385,12 +1516,8 @@
         const data = await response.json();
         document.querySelector('#healthDot').classList.toggle('ok', data.ok);
         document.querySelector('#healthText').textContent = data.ok ? 'online' : 'offline';
-        state.textContent = 'ready';
-        state.className = 'pill good';
       } catch {
         document.querySelector('#healthText').textContent = 'offline';
-        state.textContent = 'offline';
-        state.className = 'pill bad';
       }
     }
 
