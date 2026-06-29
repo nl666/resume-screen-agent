@@ -1,0 +1,15 @@
+候选人：张三
+
+工作经历：
+2022.07-至今，某 SaaS 公司，后端开发工程师。
+负责 Python 后端服务开发，使用 FastAPI、PostgreSQL、Redis、Kafka 构建业务 API 和异步任务系统，参与 Docker 部署和 CI/CD 流水线维护。
+
+AI 项目：
+1. 企业知识库问答系统
+基于 LangChain、Milvus、Embedding 和 Rerank 构建 RAG 问答系统，负责文档解析、Chunk 切分、向量检索、引用溯源和答案质量优化。系统上线后用于内部客服知识查询。
+
+2. 工单处理 Agent
+基于 DeepSeek API 和 Function Calling 封装数据库查询、工单状态更新和消息通知工具。负责 Prompt 编排、工具参数校验、超时重试和日志追踪。
+
+其他：
+熟悉 REST API、HTTP、JSON、SQL，了解 Prompt Injection 防护和 Token 成本优化。写过项目复盘文档，与产品和客服团队协作推进上线。

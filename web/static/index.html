@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume Screen Agent</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fbfc;
+      --ink: #151821;
+      --muted: #6e7786;
+      --line: #dde5ee;
+      --line-strong: #c7d2df;
+      --accent: #0f8b8d;
+      --accent-dark: #0c6268;
+      --accent-2: #5b5fe8;
+      --accent-warm: #ff7959;
+      --warn: #b7791f;
+      --bad: #c24132;
+      --good: #16824f;
+      --shadow: 0 14px 34px rgba(22, 33, 52, .08);
+      --shadow-soft: 0 8px 20px rgba(22, 33, 52, .06);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(15, 139, 141, .09), transparent 32%),
+        linear-gradient(315deg, rgba(255, 121, 89, .10), transparent 28%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    header {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 0 26px;
+      border-bottom: 1px solid rgba(221, 229, 238, .82);
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 1px 0 rgba(255,255,255,.7);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 760;
+      letter-spacing: .2px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #101820;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 10px 20px rgba(16, 24, 32, .16);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--warn);
+    }
+
+    .dot.ok { background: var(--good); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
+      gap: 18px;
+      min-height: calc(100vh - 72px);
+      padding: 18px;
+    }
+
+    aside {
+      border: 1px solid rgba(221, 229, 238, .88);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .88);
+      box-shadow: var(--shadow-soft);
+      padding: 14px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    section {
+      padding: 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 14px;
+      line-height: 1.3;
+      font-weight: 760;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input[type="file"], textarea, select {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: rgba(255,255,255,.96);
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    input[type="file"] { padding: 10px; }
+
+    textarea {
+      min-height: 104px;
+      resize: vertical;
+      padding: 11px 12px;
+    }
+
+    select { padding: 10px; }
+
+    input[type="file"]:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 139, 141, .12);
+      background: #fff;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f3f7fa;
+      margin: 2px 0 14px;
+    }
+
+    .mode-tabs input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mode-tabs label {
+      display: grid;
+      place-items: center;
+      min-height: 36px;
+      margin: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 760;
+      cursor: pointer;
+      transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+    }
+
+    .mode-tabs input:checked + label {
+      background: #ffffff;
+      color: var(--ink);
+      box-shadow: 0 6px 14px rgba(22, 33, 52, .08);
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    button {
+      min-height: 42px;
+      width: 100%;
+      margin-top: 12px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: #101820;
+      color: #fff;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(16, 24, 32, .12);
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(16, 24, 32, .16);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--accent-dark);
+      border-color: #b8d6d1;
+      box-shadow: none;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+
+    .workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      border: 1px solid rgba(221, 229, 238, .9);
+      border-radius: 8px;
+      background: rgba(255,255,255,.70);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 12px;
+      padding: 16px;
+      background: rgba(255,255,255,.78);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      background: var(--panel);
+      padding: 15px 16px;
+      min-height: 82px;
+      border: 1px solid rgba(221, 229, 238, .9);
+      border-radius: 8px;
+      box-shadow: 0 5px 14px rgba(22, 33, 52, .04);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 9px;
+    }
+
+    .metric strong {
+      font-size: 22px;
+      line-height: 1.18;
+      overflow-wrap: anywhere;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      min-height: 0;
+      transition: grid-template-columns .18s ease;
+    }
+
+    .content.history-collapsed {
+      grid-template-columns: minmax(0, 1fr) 58px;
+    }
+
+    .result-pane {
+      min-width: 0;
+      padding: 24px;
+      overflow: auto;
+    }
+
+    .side-pane {
+      border-left: 1px solid var(--line);
+      background: rgba(248, 251, 252, .92);
+      padding: 20px;
+      overflow: auto;
+      transition: padding .18s ease;
+    }
+
+    .content.history-collapsed .side-pane {
+      padding: 16px 10px;
+      overflow: hidden;
+    }
+
+    .result-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .result-title h2 { margin: 0; }
+
+    .history-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button.compact {
+      width: auto;
+      min-height: 34px;
+      margin-top: 0;
+      padding: 0 12px;
+      box-shadow: none;
+      white-space: nowrap;
+    }
+
+    .history-rail {
+      display: none;
+      width: 100%;
+      min-height: 132px;
+      margin: 0;
+      padding: 10px 0;
+      border-color: #b8d6d1;
+      background: #ffffff;
+      color: var(--accent-dark);
+      box-shadow: none;
+      writing-mode: vertical-rl;
+      letter-spacing: 0;
+    }
+
+    .content.history-collapsed .history-title,
+    .content.history-collapsed .history-body {
+      display: none;
+    }
+
+    .content.history-collapsed .history-rail {
+      display: grid;
+      place-items: center;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 27px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .pill.good {
+      color: var(--good);
+      border-color: #a6d5b2;
+      background: #f4fbf6;
+    }
+
+    .pill.bad {
+      color: var(--bad);
+      border-color: #efb3ae;
+      background: #fff7f6;
+    }
+
+    .result-view {
+      display: grid;
+      gap: 14px;
+    }
+
+    .empty-state {
+      min-height: 220px;
+      display: grid;
+      align-content: center;
+      gap: 10px;
+      padding: 30px;
+      border: 1px dashed #b8c8d9;
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255,255,255,.8);
+    }
+
+    .empty-state strong {
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .decision h3 {
+      margin: 0 0 8px;
+      font-size: 19px;
+    }
+
+    .decision .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .score-ring {
+      width: 86px;
+      height: 86px;
+      display: grid;
+      place-items: center;
+      border: 8px solid #bfe3dc;
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 22px;
+      font-weight: 750;
+      background: #f8fcfa;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+      min-width: 0;
+      box-shadow: 0 6px 16px rgba(22, 33, 52, .04);
+    }
+
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 760;
+    }
+
+    .panel ul,
+    .panel ol {
+      margin: 0;
+      padding-left: 19px;
+      color: #2f3b49;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .panel li + li { margin-top: 6px; }
+
+    .wide { grid-column: 1 / -1; }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .table th,
+    .table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    .quote {
+      color: #3c4856;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      color: var(--accent-2);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    details .inside {
+      padding: 0 14px 14px;
+    }
+
+    .trace-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .trace-list li {
+      display: grid;
+      grid-template-columns: minmax(120px, 168px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 9px 0;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .trace-list code {
+      display: inline-flex;
+      width: fit-content;
+      max-width: 100%;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: #f2f8f7;
+      color: var(--accent);
+      font-family: Consolas, "Courier New", monospace;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
+
+    .trace-list span {
+      min-width: 0;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .raw-block { margin-top: 4px; }
+
+    pre {
+      max-height: 460px;
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111722;
+      color: #d9e5ef;
+      font: 13px/1.55 Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .history-item {
+      width: 100%;
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      text-align: left;
+      font-weight: 500;
+      box-shadow: none;
+    }
+
+    .history-item:hover:not(:disabled) {
+      border-color: #b8d6d1;
+      box-shadow: 0 8px 16px rgba(22, 33, 52, .08);
+      background: #fcfffe;
+    }
+
+    .history-item small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .history-summary {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 8px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .history-summary span:nth-child(odd) {
+      color: #8491a3;
+    }
+
+    @media (max-width: 980px) {
+      main, .content {
+        grid-template-columns: 1fr;
+      }
+
+      .content.history-collapsed {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 12px;
+      }
+
+      aside {
+        max-height: none;
+      }
+
+      .side-pane {
+        border-left: 0;
+      }
+
+      .content.history-collapsed .side-pane {
+        padding: 14px;
+      }
+
+      .history-rail {
+        min-height: 42px;
+        writing-mode: horizontal-tb;
+      }
+
+      .summary-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .detail-grid,
+      .decision {
+        grid-template-columns: 1fr;
+      }
+
+      .trace-list li {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark">RS</div>
+      <h1>Resume Screen Agent</h1>
+    </div>
+    <div class="status"><span id="healthDot" class="dot"></span><span id="healthText">checking</span></div>
+  </header>
+
+  <main>
+    <aside>
+      <section>
+        <h2>简历筛选</h2>
+        <form id="screenForm">
+          <div class="mode-tabs">
+            <input id="screenSingle" type="radio" name="screen_mode" value="single" checked>
+            <label for="screenSingle">单份</label>
+            <input id="screenBatch" type="radio" name="screen_mode" value="batch">
+            <label for="screenBatch">批量</label>
+          </div>
+          <label for="screenFiles">文件</label>
+          <input id="screenFiles" name="files" type="file" accept=".txt,.md,.docx,.pdf,.csv,.jsonl" required>
+          <p id="screenHint" class="hint">单份模式会筛选 1 份简历并展示完整报告。</p>
+          <div class="row">
+            <div>
+              <label for="agentMode">Agent 模式</label>
+              <select id="agentMode" name="mode">
+                <option value="dynamic">动态 Agent 模式</option>
+                <option value="fixed">固定流程模式</option>
+              </select>
+            </div>
+            <div>
+              <label for="maxSteps">最大工具调用轮数</label>
+              <select id="maxSteps" name="max_steps">
+                <option value="12">12 轮</option>
+                <option value="16">16 轮</option>
+                <option value="20">20 轮</option>
+              </select>
+            </div>
+          </div>
+          <p id="agentModeHint" class="hint">动态 Agent 模式会按“思考-调用工具-观察结果”的循环执行；最大工具调用轮数用于限制最多循环多少轮。</p>
+          <label class="check-row"><input type="checkbox" name="redact" checked> 脱敏</label>
+          <button id="screenSubmit" type="submit">运行筛选</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>知识库问答</h2>
+        <form id="ragForm">
+          <label for="question">问题</label>
+          <textarea id="question" name="question" placeholder="可以询问岗位能力、评分规则、项目模块、筛选依据，系统会从本地向量知识库里找参考资料。"></textarea>
+          <p class="hint">这里会先把知识库内容转成向量，再按问题相似度检索相关片段，用来解释岗位要求、评分规则、项目模块和筛选依据。</p>
+          <div class="row">
+            <div>
+              <label for="topK">参考资料数量</label>
+              <select id="topK" name="top_k">
+                <option value="3">3 条</option>
+                <option value="5" selected>5 条</option>
+                <option value="8">8 条</option>
+              </select>
+            </div>
+            <label class="check-row"><input type="checkbox" name="use_llm"> 基于资料生成完整回答</label>
+          </div>
+          <button type="submit">查询知识库</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>质量检查</h2>
+        <button id="evalButton" type="button" class="secondary">检查系统效果</button>
+      </section>
+    </aside>
+
+    <div class="workspace">
+      <div class="summary-bar">
+        <div class="metric"><span>候选人</span><strong id="metricName">-</strong></div>
+        <div class="metric"><span>分数</span><strong id="metricScore">-</strong></div>
+        <div class="metric"><span>等级</span><strong id="metricLevel">-</strong></div>
+        <div class="metric"><span>门槛</span><strong id="metricGate">-</strong></div>
+      </div>
+
+      <div id="contentShell" class="content history-collapsed">
+        <div class="result-pane">
+          <div class="result-title">
+            <h2>结果</h2>
+            <span id="resultState" class="pill">idle</span>
+          </div>
+          <div id="resultView" class="result-view">
+            <div class="empty-state">
+              <strong>等待运行</strong>
+              <span>上传简历、批量筛选、查询知识库或检查系统效果后，这里会显示结构化结果。</span>
+            </div>
+          </div>
+          <details class="raw-block">
+            <summary>原始 JSON</summary>
+            <div class="inside">
+              <pre id="output">{}</pre>
+            </div>
+          </details>
+        </div>
+
+        <div id="historyPane" class="side-pane">
+          <div class="result-title history-title">
+            <h2>历史</h2>
+            <div class="history-actions">
+              <button id="historyToggle" type="button" class="secondary compact" aria-expanded="true" aria-controls="historyBody">收起</button>
+              <button id="refreshButton" type="button" class="secondary compact">刷新</button>
+            </div>
+          </div>
+          <div id="historyBody" class="history-body">
+            <div id="history" class="history-list"></div>
+          </div>
+          <button id="historyExpand" type="button" class="history-rail" aria-expanded="false" aria-controls="historyBody">历史</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const output = document.querySelector('#output');
+    const resultView = document.querySelector('#resultView');
+    const state = document.querySelector('#resultState');
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const screenFiles = document.querySelector('#screenFiles');
+    const screenHint = document.querySelector('#screenHint');
+    const screenSubmit = document.querySelector('#screenSubmit');
+    const agentMode = document.querySelector('#agentMode');
+    const agentModeHint = document.querySelector('#agentModeHint');
+    const contentShell = document.querySelector('#contentShell');
+    const historyToggle = document.querySelector('#historyToggle');
+    const historyExpand = document.querySelector('#historyExpand');
+    const appUrl = 'http://127.0.0.1:8000/';
+
+    function isFilePreview() {
+      return location.protocol === 'file:';
+    }
+
+    function showFilePreviewWarning() {
+      document.querySelector('#healthDot').classList.remove('ok');
+      document.querySelector('#healthText').textContent = '需要启动服务';
+      state.textContent = 'offline';
+      state.className = 'pill bad';
+      output.textContent = '{}';
+      resultView.innerHTML = `<div class="empty-state"><strong>当前只是静态文件预览</strong><span>请先启动后端服务，然后打开 ${appUrl} 使用筛选、知识库问答和质量检查。</span></div>`;
+    }
+
+    function setBusy(value) {
+      buttons.forEach(button => button.disabled = value);
+      if (value) {
+        state.textContent = 'running';
+        state.className = 'pill';
+      }
+    }
+
+    function show(data) {
+      output.textContent = JSON.stringify(data, null, 2);
+      updateMetrics(data);
+      renderResult(data);
+      loadHistory();
+    }
+
+    function updateMetrics(data) {
+      const result = data.result || data;
+      const report = result.final_report || {};
+      const summary = data.summary || result.summary || {};
+      const rag = result.answer ? result : null;
+      document.querySelector('#metricName').textContent = report.candidate_name || (data.batch_id ? '批量' : result.suite ? '质量检查' : rag ? '知识库问答' : '-');
+      document.querySelector('#metricScore').textContent = report.score ?? (summary.passed_cases !== undefined ? `${summary.passed_cases}/${summary.total_cases}` : summary.ok !== undefined ? `${summary.ok}/${summary.total}` : rag ? `${(rag.sources || []).length} 条` : '-');
+      document.querySelector('#metricLevel').textContent = report.level ? levelLabel(report.level) : (summary.failed_cases !== undefined ? `失败 ${summary.failed_cases}` : summary.failed !== undefined ? `失败 ${summary.failed}` : rag ? confidenceLabel(rag.confidence) : '-');
+      document.querySelector('#metricGate').textContent = report.must_have_result ? gateLabel(report.must_have_result) : (summary.passed_assertions !== undefined ? `${summary.passed_assertions}/${summary.total_assertions}` : '-');
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
+    function asArray(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function listHtml(items, emptyText = '暂无') {
+      const values = asArray(items).filter(Boolean);
+      if (!values.length) return `<p class="quote">${esc(emptyText)}</p>`;
+      return `<ul>${values.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
+    }
+
+    function renderResult(data) {
+      const result = data.result || data;
+      if (result.final_report) {
+        renderScreening(result, data.result_file || data.result_id);
+      } else if (data.batch_id && Array.isArray(data.items)) {
+        renderBatch(data);
+      } else if (result.answer && Array.isArray(result.sources)) {
+        renderRag(result);
+      } else if (result.suite && result.summary) {
+        renderEval(result);
+      } else if (data.summary && data.items) {
+        renderBatch(data);
+      } else {
+        resultView.innerHTML = `<div class="empty-state"><strong>结果已返回</strong><span>未识别到专用视图，可在下方查看原始 JSON。</span></div>`;
+      }
+    }
+
+    function renderScreening(result, fileLabel) {
+      const report = result.final_report || {};
+      const evidence = asArray(report.evidence).slice(0, 10);
+      const reasoning = asArray(result.reasoning_trace);
+      const tools = asArray(result.tool_trace);
+      const review = report.human_review_required ? '需要人工复核' : '无需强制复核';
+      resultView.innerHTML = `
+        <div class="decision">
+          <div>
+            <h3>${esc(report.candidate_name || '候选人')}</h3>
+            <div class="meta">
+              ${badge(levelLabel(report.level))}
+              ${badge(gateLabel(report.must_have_result))}
+              ${badge(review, report.human_review_required ? 'bad' : 'good')}
+              ${fileLabel ? badge(fileLabel) : ''}
+            </div>
+          </div>
+          <div class="score-ring">${esc(report.score ?? '-')}</div>
+        </div>
+
+        <div class="detail-grid">
+          <div class="panel">
+            <h3>优势</h3>
+            ${listHtml(report.strengths)}
+          </div>
+          <div class="panel">
+            <h3>风险</h3>
+            ${listHtml(report.risks, '暂无明显风险')}
+          </div>
+          <div class="panel">
+            <h3>缺失信息</h3>
+            ${listHtml(report.missing_information, '暂无')}
+          </div>
+          <div class="panel">
+            <h3>建议下一步</h3>
+            <p class="quote">${esc(report.recommended_next_step || '暂无')}</p>
+          </div>
+        </div>
+
+        <div class="panel wide">
+          <h3>证据片段</h3>
+          ${evidenceTable(evidence)}
+        </div>
+
+        ${traceDetails('执行思路', reasoning.map(item => ({
+          name: `第 ${item.step} 步`,
+          text: traceTextLabel(`${item.thought || ''}${item.action?.tool_name ? ` 调用：${toolLabel(item.action.tool_name)}` : ''}`)
+        })))}
+
+        ${traceDetails('工具调用记录', tools.map(item => ({
+          name: toolLabel(item.name),
+          text: summarizeToolResult(item.result)
+        })))}
+      `;
+    }
+
+    function renderBatch(data) {
+      const items = asArray(data.items);
+      resultView.innerHTML = `
+        <div class="decision">
+          <div>
+            <h3>批量筛选</h3>
+            <div class="meta">
+              ${badge(`总数 ${data.summary?.total ?? items.length}`)}
+              ${badge(`成功 ${data.summary?.ok ?? 0}`, 'good')}
+              ${badge(`失败 ${data.summary?.failed ?? 0}`, data.summary?.failed ? 'bad' : 'good')}
+            </div>
+          </div>
+          <div class="score-ring">${esc(data.summary?.ok ?? 0)}</div>
+        </div>
+        <div class="panel wide">
+          <h3>候选人列表</h3>
+          <table class="table">
+            <thead><tr><th>文件</th><th>分数</th><th>等级</th><th>门槛</th><th>状态</th></tr></thead>
+            <tbody>${items.map(item => {
+              const s = item.summary || {};
+              return `<tr><td>${esc(item.source_file || '')}</td><td>${esc(s.score ?? '-')}</td><td>${esc(levelLabel(s.level))}</td><td>${esc(gateLabel(s.must_have_result))}</td><td>${esc(item.ok ? '成功' : item.error || '失败')}</td></tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderRag(result) {
+      const sources = asArray(result.sources);
+      const retrieval = result.retrieval || {};
+      resultView.innerHTML = `
+        <div class="decision">
+          <div>
+            <h3>知识库回答</h3>
+            <div class="meta">
+              ${badge(`匹配度 ${confidenceLabel(result.confidence)}`)}
+              ${retrieval.mode ? badge(`检索方式 ${retrievalModeLabel(retrieval.mode)}`) : ''}
+              ${badge(`${sources.length} 条参考资料`)}
+              ${retrieval.chunk_count !== undefined ? badge(`索引片段 ${retrieval.chunk_count}`) : ''}
+            </div>
+          </div>
+          <div class="score-ring">${sources.length}</div>
+        </div>
+        <div class="panel wide">
+          <h3>回答</h3>
+          <p class="quote">${esc(result.answer || '')}</p>
+        </div>
+        <div class="panel wide">
+          <h3>参考资料</h3>
+          ${sourceTable(sources)}
+        </div>
+      `;
+    }
+
+    function renderEval(result) {
+      const summary = result.summary || {};
+      const cases = asArray(result.cases);
+      resultView.innerHTML = `
+        <div class="decision">
+          <div>
+            <h3>系统效果检查</h3>
+            <div class="meta">
+              ${badge(`${summary.passed_cases ?? 0}/${summary.total_cases ?? 0} 个样例通过`, summary.failed_cases ? 'bad' : 'good')}
+              ${badge(`${summary.passed_assertions ?? 0}/${summary.total_assertions ?? 0} 条检查通过`, summary.failed_assertions ? 'bad' : 'good')}
+              ${badge(`通过率 ${summary.pass_rate ?? '-'}`)}
+            </div>
+          </div>
+          <div class="score-ring">${esc(summary.failed_cases ?? 0)}</div>
+        </div>
+        <div class="panel wide">
+          <h3>检查明细</h3>
+          <table class="table">
+            <thead><tr><th>样例</th><th>是否通过</th><th>分数</th><th>等级</th><th>门槛</th></tr></thead>
+            <tbody>${cases.map(item => `<tr><td>${esc(item.id)}</td><td>${esc(item.passed ? '通过' : '未通过')}</td><td>${esc(item.score ?? '-')}</td><td>${esc(levelLabel(item.level))}</td><td>${esc(gateLabel(item.must_have_result))}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function evidenceTable(items) {
+      if (!items.length) return `<p class="quote">暂无证据</p>`;
+      return `<table class="table">
+        <thead><tr><th>维度</th><th>分</th><th>证据强度</th><th>简历证据</th></tr></thead>
+        <tbody>${items.map(item => `<tr><td>${esc(item.criterion || '')}</td><td>${esc(item.score ?? '')}</td><td>${esc(evidenceStrengthLabel(item.evidence_strength))}</td><td class="quote">${esc(item.resume_text || '')}${item.strength_reason ? `<br><small>${esc(item.strength_reason)}</small>` : ''}</td></tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    function sourceTable(items) {
+      if (!items.length) return `<p class="quote">暂无来源</p>`;
+      return `<table class="table">
+        <thead><tr><th>文件</th><th>Chunk</th><th>片段</th></tr></thead>
+        <tbody>${items.map(item => `<tr><td>${esc(item.file || '')}</td><td>${esc(item.chunk_id || '')}</td><td class="quote">${esc(item.quote || '')}</td></tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    function traceDetails(title, items) {
+      if (!items.length) return '';
+      return `<details>
+        <summary>${esc(title)}</summary>
+        <div class="inside">
+          <ul class="trace-list">
+            ${items.map(item => `<li><code>${esc(item.name)}</code><span>${esc(traceTextLabel(item.text))}</span></li>`).join('')}
+          </ul>
+        </div>
+      </details>`;
+    }
+
+    function summarizeToolResult(result) {
+      if (!result) return '';
+      if (result.report) {
+        return `分数 ${result.report.score ?? '-'}, 等级 ${levelLabel(result.report.level)}, 门槛 ${gateLabel(result.report.must_have_result)}`;
+      }
+      if (result.must_have_result) return `门槛 ${gateLabel(result.must_have_result)}, 命中 ${result.matched_count ?? 0} 项`;
+      if (result.verified_count !== undefined) return `证据通过 ${result.verified_count} 项，未通过 ${result.failed_count ?? 0} 项`;
+      if (result.sources) return `${result.sources.length} 条参考资料`;
+      if (result.level) return `等级 ${levelLabel(result.level)}`;
+      if (result.written) return `报告已写入 ${result.out_path}`;
+      if (result.extraction_status) return `解析状态 ${statusLabel(result.extraction_status)}，文本长度 ${result.extracted_text_chars ?? 0} 字符`;
+      return JSON.stringify(result).slice(0, 160);
+    }
+
+    function badge(text, tone = '') {
+      return `<span class="pill ${tone}">${esc(text)}</span>`;
+    }
+
+    function confidenceLabel(value) {
+      const map = { high: '高', medium: '中', low: '低' };
+      return map[value] || value || '-';
+    }
+
+    function retrievalModeLabel(value) {
+      const map = {
+        hybrid: '向量+关键词混合',
+        vector: '向量相似度',
+        keyword: '关键词匹配'
+      };
+      return map[value] || value || '-';
+    }
+
+    function levelLabel(value) {
+      const map = {
+        strong_match: '强匹配',
+        review: '建议复核',
+        backup: '备选',
+        weak_match: '弱匹配',
+        not_recommended: '不推荐'
+      };
+      return map[value] || value || '-';
+    }
+
+    function toolLabel(value) {
+      const map = {
+        read_resume: '读取简历',
+        lookup_screening_rules: '检索评分规则',
+        load_screening_result: '读取已有初筛结果',
+        check_must_have: '检查硬性门槛',
+        keyword_score_resume: '关键词评分',
+        build_report_from_screening_result: '生成筛选报告',
+        verify_evidence: '校验证据',
+        derive_level: '计算候选人等级',
+        finalize_report: '汇总最终报告',
+        export_report: '导出报告'
+      };
+      return map[value] || value || '-';
+    }
+
+    function gateLabel(value) {
+      const map = {
+        pass: '通过',
+        fail: '未通过',
+        unclear: '需要确认'
+      };
+      return map[value] || value || '-';
+    }
+
+    function statusLabel(value) {
+      const map = {
+        ok: '成功',
+        empty: '未解析到文本',
+        failed: '失败'
+      };
+      return map[value] || value || '-';
+    }
+
+    function evidenceStrengthLabel(value) {
+      const map = {
+        implemented: '已落地',
+        used: '使用过',
+        mentioned: '仅提及',
+        learning: '学习了解',
+        planned: '计划中',
+        not_implemented: '未实现'
+      };
+      return map[value] || '-';
+    }
+
+    function traceTextLabel(value) {
+      return String(value || '')
+        .replaceAll('final_report', '最终报告')
+        .replaceAll('screening_result', '初筛结果')
+        .replaceAll('must_have_result', '门槛结果');
+    }
+
+    async function requestJson(url, options = {}) {
+      if (isFilePreview()) {
+        showFilePreviewWarning();
+        return;
+      }
+      setBusy(true);
+      try {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || response.statusText);
+        state.textContent = 'ok';
+        state.className = 'pill good';
+        show(data);
+      } catch (error) {
+        state.textContent = 'error';
+        state.className = 'pill bad';
+        output.textContent = String(error);
+        resultView.innerHTML = `<div class="empty-state"><strong>请求失败</strong><span>${esc(error)}</span></div>`;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function currentScreenMode() {
+      return document.querySelector('input[name="screen_mode"]:checked').value;
+    }
+
+    function updateScreenMode() {
+      const mode = currentScreenMode();
+      screenFiles.multiple = mode === 'batch';
+      screenFiles.value = '';
+      screenHint.textContent = mode === 'batch'
+        ? '批量模式可一次选择多份简历，结果会按文件汇总。'
+        : '单份模式会筛选 1 份简历并展示完整报告。';
+      screenSubmit.textContent = mode === 'batch' ? '批量筛选' : '运行筛选';
+    }
+
+    function updateAgentModeHint() {
+      agentModeHint.textContent = agentMode.value === 'dynamic'
+        ? '动态 Agent 模式会按“思考-调用工具-观察结果”的循环执行；最大工具调用轮数用于限制最多循环多少轮。'
+        : '固定流程模式会按预设顺序执行读取、门槛检查、评分、证据校验和分层，适合稳定对比。';
+    }
+
+    document.querySelectorAll('input[name="screen_mode"]').forEach(input => {
+      input.addEventListener('change', updateScreenMode);
+    });
+    agentMode.addEventListener('change', updateAgentModeHint);
+
+    document.querySelector('#screenForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const mode = currentScreenMode();
+      const body = new FormData();
+      body.append('mode', form.mode.value);
+      body.append('max_steps', form.max_steps.value);
+      if (form.redact.checked) body.append('redact', 'true');
+
+      const files = Array.from(screenFiles.files || []);
+      if (!files.length) {
+        state.textContent = 'error';
+        state.className = 'pill bad';
+        resultView.innerHTML = `<div class="empty-state"><strong>请选择文件</strong><span>先选择简历文件，再运行筛选。</span></div>`;
+        return;
+      }
+
+      if (mode === 'single') {
+        body.append('file', files[0]);
+        requestJson('/api/screen-resume', { method: 'POST', body });
+      } else {
+        files.forEach(file => body.append('files', file));
+        requestJson('/api/batch-screen', { method: 'POST', body });
+      }
+    });
+
+    document.querySelector('#ragForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const question = form.question.value.trim();
+      if (!question) {
+        state.textContent = 'error';
+        state.className = 'pill bad';
+        output.textContent = '{}';
+        resultView.innerHTML = `<div class="empty-state"><strong>请输入问题</strong><span>可以询问岗位能力、评分规则、项目模块或筛选依据。</span></div>`;
+        return;
+      }
+      const payload = {
+        question,
+        top_k: Number(form.top_k.value),
+        use_llm: form.use_llm.checked,
+        retrieval_mode: 'hybrid'
+      };
+      requestJson('/api/rag-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    });
+
+    document.querySelector('#evalButton').addEventListener('click', () => {
+      requestJson('/api/run-eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+    });
+
+    document.querySelector('#refreshButton').addEventListener('click', loadHistory);
+    historyToggle.addEventListener('click', () => setHistoryCollapsed(true));
+    historyExpand.addEventListener('click', () => setHistoryCollapsed(false));
+
+    function setHistoryCollapsed(value) {
+      contentShell.classList.toggle('history-collapsed', value);
+      historyToggle.setAttribute('aria-expanded', String(!value));
+      historyExpand.setAttribute('aria-expanded', String(!value));
+    }
+
+    async function loadHistory() {
+      const history = document.querySelector('#history');
+      if (isFilePreview()) {
+        history.innerHTML = '<p class="quote">启动后端服务后可查看历史结果。</p>';
+        return;
+      }
+      const response = await fetch('/api/results');
+      const data = await response.json();
+      history.innerHTML = '';
+      data.items.slice(0, 30).forEach(item => {
+        const button = document.createElement('button');
+        button.className = 'history-item';
+        button.type = 'button';
+        button.textContent = item.name;
+        button.appendChild(historySummary(item.summary || {}));
+        button.addEventListener('click', async () => {
+          const res = await fetch('/api/result?name=' + encodeURIComponent(item.name));
+          show(await res.json());
+        });
+        history.appendChild(button);
+      });
+    }
+
+    function historySummary(summary) {
+      const wrap = document.createElement('div');
+      wrap.className = 'history-summary';
+      const entries = Object.entries(summary).filter(([, value]) => value !== '' && value !== undefined).slice(0, 4);
+      if (!entries.length) {
+        const empty = document.createElement('small');
+        empty.textContent = 'no summary';
+        return empty;
+      }
+      entries.forEach(([key, value]) => {
+        const k = document.createElement('span');
+        k.textContent = summaryKeyLabel(key);
+        const v = document.createElement('span');
+        v.textContent = key === 'confidence' ? confidenceLabel(value) : key === 'level' ? levelLabel(value) : key === 'must_have_result' ? gateLabel(value) : String(value);
+        wrap.appendChild(k);
+        wrap.appendChild(v);
+      });
+      return wrap;
+    }
+
+    function summaryKeyLabel(key) {
+      const map = {
+        candidate_name: '候选人',
+        must_have_result: '门槛',
+        score: '分数',
+        level: '等级',
+        answer: '回答',
+        confidence: '匹配度',
+        total: '总数',
+        ok: '成功',
+        failed: '失败',
+        passed_cases: '通过样例',
+        total_cases: '样例总数',
+        passed_assertions: '通过检查',
+        total_assertions: '检查总数'
+      };
+      return map[key] || key;
+    }
+
+    async function checkHealth() {
+      if (isFilePreview()) {
+        showFilePreviewWarning();
+        return;
+      }
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        document.querySelector('#healthDot').classList.toggle('ok', data.ok);
+        document.querySelector('#healthText').textContent = data.ok ? 'online' : 'offline';
+        state.textContent = 'ready';
+        state.className = 'pill good';
+      } catch {
+        document.querySelector('#healthText').textContent = 'offline';
+        state.textContent = 'offline';
+        state.className = 'pill bad';
+      }
+    }
+
+    checkHealth();
+    updateScreenMode();
+    updateAgentModeHint();
+    loadHistory();
+  </script>
+</body>
+</html>

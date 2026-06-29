@@ -1,0 +1,23 @@
+岗位名称：AI Agent 开发工程师 / AI 应用开发工程师（Agent 方向）
+
+岗位定位：
+负责基于大语言模型的 AI Agent 应用与能力平台建设，围绕实际业务场景完成智能体设计、RAG 知识库、工具调用、工作流编排、系统集成、评测优化与生产化交付。我们希望候选人不只是会调用模型 API，而是能把 AI 能力做成稳定、可维护、可上线的产品。
+
+岗位职责：
+1. 负责 AI Agent / AI 助理相关功能的设计、开发与落地，覆盖多轮对话、上下文管理、任务规划、工具调用、结果回写等完整链路。
+2. 负责 RAG 系统建设，包括文档解析、Chunk 切分、Embedding、向量检索、Rerank、混合检索、引用溯源与知识库权限控制。
+3. 负责 Tool Calling / Function Calling / MCP Server / MCP Client 等工具链开发，将数据库、搜索引擎、第三方 API、企业内部系统封装为 Agent 可调用能力。
+4. 基于 LangGraph、LangChain、Dify、AutoGen、CrewAI 等框架或自研方案，设计 Agent Workflow、多 Agent 协作、DAG 编排、条件分支、循环与状态管理。
+5. 参与 AI 应用后端服务开发，包括 API 设计、会话存储、消息管理、缓存、异步任务、数据库、权限鉴权与系统集成。
+6. 建立 Agent 评测与优化机制，持续优化任务成功率、回答准确率、工具调用成功率、首 token 延迟、Token 成本、稳定性与可观测性。
+7. 与产品、业务、算法、前后端、安全团队协作，将业务需求转化为可落地的 Agent 技术方案，并完成迭代上线。
+
+任职要求：
+1. 2 年以上后端开发或 AI 应用开发经验，具备良好的编码习惯、系统设计能力和问题排查能力。
+2. 熟练掌握 Python，并熟悉 Java / Go / TypeScript / JavaScript 中至少一种语言。
+3. 熟悉 REST API、HTTP、JSON、异步编程、数据库设计与 SQL，了解 Redis、Kafka / RabbitMQ、Elasticsearch、PostgreSQL / MySQL 等常见基础组件。
+4. 熟悉主流 LLM API 或模型服务接入，理解 Prompt Engineering、Structured Output、Function Calling、Tool Calling。
+5. 熟悉 Agent 基本机制，包括任务拆解、Planning、Memory、Tool Use、上下文管理、多轮对话、工作流编排等。
+6. 有 RAG、向量数据库、知识库问答、语义检索相关经验。
+7. 熟悉 LangGraph、LangChain、Dify、AutoGen、CrewAI、LlamaIndex、Spring AI 等至少一种 Agent / LLM 应用框架。
+8. 了解 Docker、Kubernetes、CI/CD、日志、监控、链路追踪、灰度发布等工程化实践。
