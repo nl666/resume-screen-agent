@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.venv*/
 venv/
 results/*
 !results/.gitkeep
@@ -19,3 +20,4 @@ data/resumes/*
 !data/resumes/.gitkeep
 data/uploads/*
 data/vector_index/*
+data/chroma_db/*

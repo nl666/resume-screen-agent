@@ -24,6 +24,7 @@ EMBEDDING_DIMENSIONS = 512
 
 _VALID_CONFIDENCE = {"high", "medium", "low"}
 _VALID_RETRIEVAL_MODES = {"keyword", "vector", "hybrid"}
+_VALID_VECTOR_STORES = {"local", "chroma"}
 
 SparseVector = dict[int, float]
 
@@ -442,6 +443,13 @@ def _normalize_retrieval_mode(mode: str) -> str:
     return normalized
 
 
+def _normalize_vector_store(vector_store: str) -> str:
+    normalized = str(vector_store or "local").strip().lower()
+    if normalized not in _VALID_VECTOR_STORES:
+        return "local"
+    return normalized
+
+
 def query_knowledge_base(
     question: str,
     knowledge_dir: str | Path = DEFAULT_KNOWLEDGE_DIR,
@@ -449,11 +457,29 @@ def query_knowledge_base(
     use_llm: bool = False,
     model: ChatModel | None = None,
     retrieval_mode: str = "hybrid",
+    vector_store: str = "local",
     index_path: str | Path | None = None,
     rebuild_index: bool = False,
+    chroma_dir: str | Path | None = None,
+    embedding_model: str | None = None,
 ) -> dict[str, Any]:
     """Query the knowledge base with vector/hybrid retrieval and citations."""
     mode = _normalize_retrieval_mode(retrieval_mode)
+    store = _normalize_vector_store(vector_store)
+
+    if store == "chroma":
+        from .chroma_rag import DEFAULT_BGE_MODEL, DEFAULT_CHROMA_DIR, query_chroma_knowledge_base
+
+        return query_chroma_knowledge_base(
+            question=question,
+            knowledge_dir=knowledge_dir,
+            top_k=top_k,
+            use_llm=use_llm,
+            model=model,
+            persist_dir=chroma_dir or DEFAULT_CHROMA_DIR,
+            model_name=embedding_model or DEFAULT_BGE_MODEL,
+            rebuild_index=rebuild_index,
+        )
 
     if mode == "keyword":
         docs = load_documents(knowledge_dir)
@@ -473,6 +499,7 @@ def query_knowledge_base(
 
     metadata = {
         "mode": mode,
+        "vector_store": "local",
         "embedding_model": EMBEDDING_MODEL_NAME if mode != "keyword" else None,
         "embedding_dimensions": EMBEDDING_DIMENSIONS if mode != "keyword" else None,
         "index_path": str(resolved_index_path) if resolved_index_path else None,

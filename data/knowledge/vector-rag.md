@@ -36,6 +36,34 @@
 - FAISS：适合本地高性能向量检索
 - Qdrant / Milvus：适合服务化、权限、多租户、较大规模知识库
 
+## BGE + Chroma 增强模式
+
+本项目已支持可选增强后端：
+
+```text
+知识库文档 -> Chunk -> BGE Embedding -> Chroma 本地向量库 -> 向量相似度检索 -> 引用溯源
+```
+
+安装依赖：
+
+```bash
+pip install -r requirements-bge-chroma.txt
+```
+
+构建 Chroma 索引：
+
+```bash
+python scripts/build_chroma_index.py
+```
+
+查询：
+
+```bash
+python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --vector-store chroma --retrieval-only
+```
+
+默认模型是 `BAAI/bge-small-zh-v1.5`。第一次运行会下载模型，下载完成后可复用本地缓存。
+
 ## 对简历筛选系统的价值
 
 向量 RAG 主要用于解释和校准筛选依据：

@@ -34,6 +34,7 @@ resume-screen-agent/
   results/
   scripts/
     batch_screen.py
+    build_chroma_index.py
     build_vector_index.py
     eval_agent.py
     mcp_server.py
@@ -66,6 +67,7 @@ resume-screen-agent/
       index.html
   .env.example
   requirements.txt
+  requirements-bge-chroma.txt
 ```
 
 ## 安装依赖
@@ -136,6 +138,13 @@ data/knowledge/
 python scripts/build_vector_index.py
 ```
 
+可选：安装并构建 BGE + Chroma 本地向量库：
+
+```bash
+pip install -r requirements-bge-chroma.txt
+python scripts/build_chroma_index.py
+```
+
 运行问答：
 
 ```bash
@@ -148,6 +157,12 @@ python scripts/rag_qa.py --question "什么样的证据能证明 RAG 经验？" 
 python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --retrieval-mode vector --retrieval-only
 ```
 
+使用 BGE + Chroma 查询：
+
+```bash
+python scripts/rag_qa.py --question "MCP Server 暴露了哪些工具？" --vector-store chroma --retrieval-only
+```
+
 输出包含：
 
 ```text
@@ -155,6 +170,13 @@ answer：基于知识库的回答
 sources：来源文件、chunk_id、引用片段
 confidence：high / medium / low
 retrieval：检索方式、向量模型、索引路径、知识片段数量
+```
+
+说明：
+
+```text
+默认 local 模式：无需额外依赖，使用本地 hashing embedding + JSON 向量索引。
+增强 chroma 模式：使用 BGE embedding + Chroma 本地向量数据库，语义检索效果更接近真实生产 RAG。
 ```
 
 ## Tool Calling Agent

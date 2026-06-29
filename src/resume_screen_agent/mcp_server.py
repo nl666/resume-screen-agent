@@ -53,6 +53,12 @@ def get_mcp_tools() -> list[dict[str, Any]]:
                         "default": "hybrid",
                         "description": "hybrid uses vector similarity plus keyword matching; vector uses vector similarity only.",
                     },
+                    "vector_store": {
+                        "type": "string",
+                        "enum": ["local", "chroma"],
+                        "default": "local",
+                        "description": "local uses the dependency-free JSON vector index; chroma uses BGE embeddings with a local Chroma database.",
+                    },
                     "rebuild_index": {"type": "boolean", "default": False},
                     "out_path": {"type": "string", "description": "Optional output JSON path, relative to project root."},
                 },
@@ -194,6 +200,7 @@ def _tool_rag_query(args: dict[str, Any]) -> dict[str, Any]:
     top_k = int(args.get("top_k", 5))
     use_llm = bool(args.get("use_llm", False))
     retrieval_mode = str(args.get("retrieval_mode", "hybrid"))
+    vector_store = str(args.get("vector_store", "local"))
     rebuild_index = bool(args.get("rebuild_index", False))
     knowledge_dir = _optional_read_path(args.get("knowledge_dir")) or DEFAULT_KNOWLEDGE_DIR
     out_path = _optional_write_path(args.get("out_path"))
@@ -204,6 +211,7 @@ def _tool_rag_query(args: dict[str, Any]) -> dict[str, Any]:
         top_k=top_k,
         use_llm=use_llm,
         retrieval_mode=retrieval_mode,
+        vector_store=vector_store,
         rebuild_index=rebuild_index,
     )
 

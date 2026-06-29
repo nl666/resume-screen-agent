@@ -755,6 +755,13 @@
                 <option value="8">8 条</option>
               </select>
             </div>
+            <div>
+              <label for="vectorStore">向量后端</label>
+              <select id="vectorStore" name="vector_store">
+                <option value="local" selected>本地轻量索引</option>
+                <option value="chroma">BGE + Chroma</option>
+              </select>
+            </div>
             <label class="check-row"><input type="checkbox" name="use_llm"> 基于资料生成完整回答</label>
           </div>
           <button type="submit">查询知识库</button>
@@ -991,6 +998,7 @@
             <h3>知识库回答</h3>
             <div class="meta">
               ${badge(`匹配度 ${confidenceLabel(result.confidence)}`)}
+              ${retrieval.vector_store ? badge(`向量库 ${vectorStoreLabel(retrieval.vector_store)}`) : ''}
               ${retrieval.mode ? badge(`检索方式 ${retrievalModeLabel(retrieval.mode)}`) : ''}
               ${badge(`${sources.length} 条参考资料`)}
               ${retrieval.chunk_count !== undefined ? badge(`索引片段 ${retrieval.chunk_count}`) : ''}
@@ -1090,6 +1098,14 @@
         hybrid: '向量+关键词混合',
         vector: '向量相似度',
         keyword: '关键词匹配'
+      };
+      return map[value] || value || '-';
+    }
+
+    function vectorStoreLabel(value) {
+      const map = {
+        local: '本地轻量向量索引',
+        chroma: 'BGE + Chroma'
       };
       return map[value] || value || '-';
     }
@@ -1247,7 +1263,8 @@
         question,
         top_k: Number(form.top_k.value),
         use_llm: form.use_llm.checked,
-        retrieval_mode: 'hybrid'
+        retrieval_mode: form.vector_store.value === 'chroma' ? 'vector' : 'hybrid',
+        vector_store: form.vector_store.value
       };
       requestJson('/api/rag-query', {
         method: 'POST',

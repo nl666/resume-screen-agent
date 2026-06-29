@@ -130,6 +130,7 @@ def create_app() -> Any:
         top_k = int(payload.get("top_k", 5))
         use_llm = bool(payload.get("use_llm", False))
         retrieval_mode = str(payload.get("retrieval_mode", "hybrid"))
+        vector_store = str(payload.get("vector_store", "local"))
         rebuild_index = bool(payload.get("rebuild_index", False))
         result = query_knowledge_base(
             question=question,
@@ -137,6 +138,7 @@ def create_app() -> Any:
             top_k=top_k,
             use_llm=use_llm,
             retrieval_mode=retrieval_mode,
+            vector_store=vector_store,
             rebuild_index=rebuild_index,
         )
 

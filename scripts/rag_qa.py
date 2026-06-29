@@ -37,6 +37,20 @@ def main() -> None:
         help="Retrieval mode: vector search, keyword search, or hybrid search.",
     )
     parser.add_argument(
+        "--vector-store",
+        choices=["local", "chroma"],
+        default="local",
+        help="Vector backend: local JSON index or Chroma with BGE embeddings.",
+    )
+    parser.add_argument(
+        "--chroma-dir",
+        help="Directory for the Chroma persistent database.",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        help="Embedding model name, for example BAAI/bge-small-zh-v1.5.",
+    )
+    parser.add_argument(
         "--rebuild-index",
         action="store_true",
         help="Rebuild the local vector index before querying.",
@@ -59,7 +73,10 @@ def main() -> None:
         use_llm=not args.retrieval_only,
         model=chat_model,
         retrieval_mode=args.retrieval_mode,
+        vector_store=args.vector_store,
         rebuild_index=args.rebuild_index,
+        chroma_dir=args.chroma_dir,
+        embedding_model=args.embedding_model,
     )
 
     output = json.dumps(result, ensure_ascii=False, indent=2)
