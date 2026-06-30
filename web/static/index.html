@@ -829,6 +829,125 @@
       color: #3c4856;
       line-height: 1.5;
       overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .citation-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .citation-summary div {
+      padding: 12px;
+      border: 1px solid rgba(0, 184, 148, .18);
+      border-radius: 12px;
+      background: #f5fffb;
+    }
+
+    .citation-summary span {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .citation-summary strong {
+      color: var(--ink);
+      font-size: 18px;
+      overflow-wrap: anywhere;
+    }
+
+    .citation-summary p {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .citation-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .citation-card {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid rgba(0, 184, 148, .20);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff, #f8fffc);
+    }
+
+    .citation-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .citation-id {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 30px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .citation-title {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+
+    .citation-title strong,
+    .citation-title span {
+      overflow-wrap: anywhere;
+    }
+
+    .citation-title strong {
+      font-size: 13px;
+    }
+
+    .citation-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .score-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      color: var(--accent-dark);
+      background: #eafff8;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .score-chip.good {
+      color: var(--good);
+      background: #f0fbf5;
+    }
+
+    .score-chip.bad {
+      color: var(--bad);
+      background: #fff3f1;
+    }
+
+    .citation-reason {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     details {
@@ -1009,8 +1128,18 @@
 
       .detail-grid,
       .decision,
+      .citation-summary,
       .progress-meta {
         grid-template-columns: 1fr;
+      }
+
+      .citation-head {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .score-chip {
+        grid-column: 1 / -1;
+        width: fit-content;
       }
 
       .trace-list li {
@@ -1464,8 +1593,11 @@
     }
 
     function renderRag(result, target) {
-      const sources = asArray(result.sources);
+      const citations = asArray(result.citations && result.citations.length ? result.citations : result.sources);
       const retrieval = result.retrieval || {};
+      const citationSummaryData = result.citation_summary || {};
+      const fileCount = citationSummaryData.file_count ?? new Set(citations.map(item => item.file).filter(Boolean)).size;
+      const topScore = citationSummaryData.top_score;
       target.innerHTML = `
         <div class="decision">
           <div>
@@ -1475,19 +1607,25 @@
               ${retrieval.answer_mode ? badge(`回答模式 ${answerModeLabel(retrieval.answer_mode)}`) : ''}
               ${retrieval.vector_store ? badge(`向量库 ${vectorStoreLabel(retrieval.vector_store)}`) : ''}
               ${retrieval.mode ? badge(`检索方式 ${retrievalModeLabel(retrieval.mode)}`) : ''}
-              ${badge(`${sources.length} 条参考资料`)}
+              ${badge(`${citations.length} 条引用证据`)}
+              ${fileCount ? badge(`覆盖 ${fileCount} 个文件`) : ''}
+              ${topScore !== undefined && topScore !== null ? badge(`最高相关度 ${formatScore(topScore)}`, topScore >= 0.66 ? 'good' : '') : ''}
               ${retrieval.chunk_count !== undefined ? badge(`索引片段 ${retrieval.chunk_count}`) : ''}
             </div>
           </div>
-          <div class="score-ring">${sources.length}</div>
+          <div class="score-ring">${citations.length}</div>
         </div>
         <div class="panel wide">
-          <h3>回答</h3>
+          <h3>回答内容</h3>
           <p class="quote">${esc(result.answer || '')}</p>
         </div>
         <div class="panel wide">
-          <h3>参考资料</h3>
-          ${sourceTable(sources)}
+          <h3>引用概览</h3>
+          ${citationSummary(citationSummaryData, citations)}
+        </div>
+        <div class="panel wide">
+          <h3>引用证据</h3>
+          ${sourceTable(citations)}
         </div>
       `;
     }
@@ -1527,10 +1665,59 @@
 
     function sourceTable(items) {
       if (!items.length) return `<p class="quote">暂无来源</p>`;
-      return `<table class="table">
-        <thead><tr><th>文件</th><th>Chunk</th><th>片段</th></tr></thead>
-        <tbody>${items.map(item => `<tr><td>${esc(item.file || '')}</td><td>${esc(item.chunk_id || '')}</td><td class="quote">${esc(item.quote || '')}</td></tr>`).join('')}</tbody>
-      </table>`;
+      return `<div class="citation-list">
+        ${items.map((item, index) => {
+          const citationId = item.citation_id || `S${index + 1}`;
+          const score = formatScore(item.score);
+          const relevance = item.relevance_label || relevanceLabel(item.relevance);
+          const tone = relevanceTone(item.relevance);
+          return `<article class="citation-card">
+            <div class="citation-head">
+              <span class="citation-id">[${esc(citationId)}]</span>
+              <div class="citation-title">
+                <strong>${esc(item.file || '未知文件')}</strong>
+                <span>${esc(item.chunk_id || '未标注片段')}</span>
+              </div>
+              <span class="score-chip ${tone}">${esc(relevance)}${score !== '-' ? ` · ${score}` : ''}</span>
+            </div>
+            <p class="quote">${esc(item.quote || '')}</p>
+            ${item.match_reason ? `<div class="citation-reason">匹配原因：${esc(item.match_reason)}</div>` : ''}
+          </article>`;
+        }).join('')}
+      </div>`;
+    }
+
+    function citationSummary(summary, citations) {
+      const files = asArray(summary.files);
+      const fileCount = summary.file_count ?? new Set(citations.map(item => item.file).filter(Boolean)).size;
+      const total = summary.total ?? citations.length;
+      const high = summary.high_relevance ?? citations.filter(item => item.relevance === 'high').length;
+      const topScore = summary.top_score;
+      const coverage = summary.coverage_text || (total ? `共命中 ${total} 个知识片段，覆盖 ${fileCount} 个文件。` : '未命中可引用的知识库片段。');
+      return `<div class="citation-summary">
+        <div><span>引用片段</span><strong>${esc(total)}</strong></div>
+        <div><span>覆盖文件</span><strong>${esc(fileCount)}</strong></div>
+        <div><span>高相关证据</span><strong>${esc(high)}</strong></div>
+        <div><span>最高相关度</span><strong>${esc(formatScore(topScore))}</strong></div>
+        <p>${esc(coverage)}</p>
+      </div>`;
+    }
+
+    function formatScore(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '-';
+      return num.toFixed(2);
+    }
+
+    function relevanceLabel(value) {
+      const map = { high: '高相关', medium: '中相关', low: '低相关', unknown: '未评分' };
+      return map[value] || '未评分';
+    }
+
+    function relevanceTone(value) {
+      if (value === 'high') return 'good';
+      if (value === 'low') return 'bad';
+      return '';
     }
 
     function traceDetails(title, items) {

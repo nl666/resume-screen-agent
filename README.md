@@ -180,9 +180,10 @@ python scripts/rag_qa.py --question "AI Agent 学习路线怎么安排？" --ans
 
 ```text
 answer：基于知识库的回答
-sources：来源文件、chunk_id、引用片段
+sources / citations：带 [S1] 编号的引用证据，包含来源文件、chunk_id、原文片段、相关度、匹配原因
+citation_summary：引用概览，包含命中片段数、覆盖文件数、高相关证据数、最高相关度
 confidence：high / medium / low
-retrieval：回答模式、检索方式、向量模型、索引路径、知识片段数量
+retrieval：回答模式、检索方式、向量模型、索引路径、知识片段数量、引用数量、覆盖文件
 ```
 
 说明：

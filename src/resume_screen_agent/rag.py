@@ -344,8 +344,18 @@ def retrieve_from_index(
     mode: str = "hybrid",
 ) -> list[Chunk]:
     """Retrieve from a persisted vector index."""
+    return [chunk for chunk, _ in retrieve_scored_from_index(question, payload, top_k=top_k, mode=mode)]
+
+
+def retrieve_scored_from_index(
+    question: str,
+    payload: dict[str, Any],
+    top_k: int = 5,
+    mode: str = "hybrid",
+) -> list[tuple[Chunk, float]]:
+    """Retrieve scored chunks from a persisted vector index."""
     records = records_from_index(payload)
-    return _retrieve_from_records(question, records, top_k=top_k, mode=mode)
+    return _retrieve_scored_from_records(question, records, top_k=top_k, mode=mode)
 
 
 def retrieve(
@@ -366,23 +376,44 @@ def retrieve(
     return _retrieve_from_records(question, records, top_k=top_k, mode=mode)
 
 
+def retrieve_scored(
+    question: str,
+    chunks: list[Chunk],
+    top_k: int = 5,
+    mode: str = "hybrid",
+) -> list[tuple[Chunk, float]]:
+    """Retrieve chunks with their raw relevance scores."""
+    mode = _normalize_retrieval_mode(mode)
+    records = build_vector_records(chunks)
+    return _retrieve_scored_from_records(question, records, top_k=top_k, mode=mode)
+
+
 def _retrieve_from_records(
     question: str,
     records: list[VectorRecord],
     top_k: int = 5,
     mode: str = "hybrid",
 ) -> list[Chunk]:
+    return [chunk for chunk, _ in _retrieve_scored_from_records(question, records, top_k=top_k, mode=mode)]
+
+
+def _retrieve_scored_from_records(
+    question: str,
+    records: list[VectorRecord],
+    top_k: int = 5,
+    mode: str = "hybrid",
+) -> list[tuple[Chunk, float]]:
     if not records:
         return []
 
     mode = _normalize_retrieval_mode(mode)
     if mode == "keyword":
         chunks = [record.chunk for record in records]
-        return retrieve_keyword(question, chunks, top_k=top_k)
+        return _score_keyword(question, chunks)[:top_k]
 
     vector_scores = _score_vector_records(question, records)
     if mode == "vector":
-        return [chunk for chunk, _ in vector_scores[:top_k]]
+        return vector_scores[:top_k]
 
     keyword_scores = dict(_score_keyword(question, [record.chunk for record in records]))
     max_vector = max((score for _, score in vector_scores), default=0.0) or 1.0
@@ -394,7 +425,7 @@ def _retrieve_from_records(
         score = (0.65 * (vector_score / max_vector)) + (0.35 * (lexical_score / max_keyword))
         combined.append((chunk, score))
     combined.sort(key=lambda x: x[1], reverse=True)
-    return [chunk for chunk, _ in combined[:top_k]]
+    return combined[:top_k]
 
 
 def _score_vector_records(question: str, records: list[VectorRecord]) -> list[tuple[Chunk, float]]:
@@ -481,7 +512,7 @@ def query_knowledge_base(
 
     if normalized_answer_mode == "free":
         result = answer_freely(question, model=model)
-        result["retrieval"] = {
+        metadata = {
             "mode": "none",
             "vector_store": "none",
             "answer_mode": "free",
@@ -490,7 +521,7 @@ def query_knowledge_base(
             "index_path": None,
             "chunk_count": 0,
         }
-        return result
+        return finalize_rag_result(question, result, metadata, sources=[])
 
     if store == "chroma":
         from .chroma_rag import DEFAULT_BGE_MODEL, DEFAULT_CHROMA_DIR, query_chroma_knowledge_base
@@ -510,7 +541,7 @@ def query_knowledge_base(
     if mode == "keyword":
         docs = load_documents(knowledge_dir)
         chunks = chunk_text(docs)
-        selected = retrieve_keyword(question, chunks, top_k=top_k)
+        scored = retrieve_scored(question, chunks, top_k=top_k, mode=mode)
         resolved_index_path: Path | None = None
         chunk_count = len(chunks)
     else:
@@ -519,9 +550,10 @@ def query_knowledge_base(
             index_path=index_path,
             rebuild=rebuild_index,
         )
-        selected = retrieve_from_index(question, index_payload, top_k=top_k, mode=mode)
+        scored = retrieve_scored_from_index(question, index_payload, top_k=top_k, mode=mode)
         resolved_index_path = _resolve_index_path(Path(knowledge_dir), index_path)
         chunk_count = len(index_payload.get("chunks", []))
+    selected = [chunk for chunk, _ in scored]
 
     metadata = {
         "mode": mode,
@@ -543,12 +575,237 @@ def query_knowledge_base(
     else:
         result = {
             "answer": f"已通过{_retrieval_mode_label(mode)}检索到 {len(selected)} 个相关知识片段。打开“生成完整回答”后，可基于这些片段生成自然语言答案。",
-            "sources": _sources_from_chunks(selected),
             "confidence": "high" if selected else "low",
         }
 
-    result["retrieval"] = metadata
-    return result
+    return finalize_rag_result(question, result, metadata, scored_chunks=scored)
+
+
+def finalize_rag_result(
+    question: str,
+    result: dict[str, Any],
+    retrieval: dict[str, Any],
+    scored_chunks: list[tuple[Chunk, float]] | None = None,
+    sources: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Attach normalized citations and retrieval metadata to a RAG response."""
+    payload = dict(result)
+    metadata = dict(retrieval)
+    mode = str(metadata.get("mode") or "vector")
+
+    if scored_chunks is not None:
+        citations = _citations_from_scored_chunks(question, scored_chunks, mode=mode)
+    else:
+        citations = _citations_from_sources(question, sources or [])
+
+    summary = _citation_summary(citations)
+    metadata.update(
+        {
+            "citation_count": summary["total"],
+            "source_files": summary["files"],
+            "top_score": summary["top_score"],
+            "score_type": _score_type_for_mode(mode, metadata.get("vector_store")),
+        }
+    )
+
+    payload["sources"] = citations
+    payload["citations"] = citations
+    payload["citation_summary"] = summary
+    payload["retrieval"] = metadata
+    payload["answer"] = _append_citation_footer(str(payload.get("answer", "")), citations)
+    return payload
+
+
+def _citations_from_scored_chunks(
+    question: str,
+    scored_chunks: list[tuple[Chunk, float]],
+    mode: str,
+    quote_chars: int = 420,
+) -> list[dict[str, Any]]:
+    score_type = _score_type_for_mode(mode, "local")
+    citations: list[dict[str, Any]] = []
+    for index, (chunk, raw_score) in enumerate(scored_chunks, start=1):
+        score = _normalize_score(raw_score, score_type)
+        quote = _clean_quote(chunk.text, quote_chars)
+        citations.append(
+            {
+                "citation_id": f"S{index}",
+                "file": chunk.source_file,
+                "chunk_id": chunk.chunk_id,
+                "quote": quote,
+                "score": score,
+                "raw_score": round(float(raw_score), 6),
+                "score_type": score_type,
+                "relevance": _relevance_value(score),
+                "relevance_label": _relevance_label(score),
+                "match_reason": _match_reason(question, quote, score, score_type),
+            }
+        )
+    return citations
+
+
+def _citations_from_sources(
+    question: str,
+    sources: list[dict[str, Any]],
+    quote_chars: int = 420,
+) -> list[dict[str, Any]]:
+    citations: list[dict[str, Any]] = []
+    for index, item in enumerate(sources, start=1):
+        quote = _clean_quote(str(item.get("quote") or item.get("text") or ""), quote_chars)
+        distance = _coerce_float(item.get("distance"))
+        similarity = _coerce_float(item.get("similarity"))
+        raw_score = _coerce_float(item.get("raw_score"))
+        score_type = str(item.get("score_type") or "")
+
+        if similarity is None and distance is not None:
+            similarity = _similarity_from_distance(distance)
+            score_type = score_type or "chroma_cosine_similarity"
+            raw_score = distance if raw_score is None else raw_score
+        if similarity is None:
+            similarity = _normalize_score(_coerce_float(item.get("score")), score_type)
+        score_type = score_type or _score_type_for_mode("vector", item.get("vector_store"))
+
+        citation = {
+            "citation_id": str(item.get("citation_id") or f"S{index}"),
+            "file": str(item.get("file") or item.get("source_file") or item.get("source") or ""),
+            "chunk_id": str(item.get("chunk_id") or ""),
+            "quote": quote,
+            "score": similarity,
+            "raw_score": round(float(raw_score), 6) if raw_score is not None else None,
+            "score_type": score_type,
+            "relevance": _relevance_value(similarity),
+            "relevance_label": _relevance_label(similarity),
+            "match_reason": _match_reason(question, quote, similarity, score_type),
+        }
+        if distance is not None:
+            citation["distance"] = round(distance, 6)
+        citations.append(citation)
+    return citations
+
+
+def _citation_summary(citations: list[dict[str, Any]]) -> dict[str, Any]:
+    files = []
+    for citation in citations:
+        file_name = citation.get("file")
+        if file_name and file_name not in files:
+            files.append(file_name)
+
+    scores = [item["score"] for item in citations if isinstance(item.get("score"), (int, float))]
+    total = len(citations)
+    high = sum(1 for item in citations if item.get("relevance") == "high")
+    medium = sum(1 for item in citations if item.get("relevance") == "medium")
+    low = sum(1 for item in citations if item.get("relevance") == "low")
+    if total:
+        coverage_text = f"共命中 {total} 个知识片段，覆盖 {len(files)} 个文件：{'、'.join(files)}。"
+    else:
+        coverage_text = "未命中可引用的知识库片段。"
+
+    return {
+        "total": total,
+        "files": files,
+        "file_count": len(files),
+        "high_relevance": high,
+        "medium_relevance": medium,
+        "low_relevance": low,
+        "top_score": round(max(scores), 4) if scores else None,
+        "coverage_text": coverage_text,
+    }
+
+
+def _append_citation_footer(answer: str, citations: list[dict[str, Any]]) -> str:
+    if not citations:
+        return answer
+
+    citation_ids = [str(item.get("citation_id")) for item in citations if item.get("citation_id")]
+    if not citation_ids or "引用来源" in answer or any(f"[{citation_id}]" in answer for citation_id in citation_ids):
+        return answer
+    return f"{answer}\n\n引用来源：{'、'.join(f'[{citation_id}]' for citation_id in citation_ids)}。"
+
+
+def _clean_quote(text: str, quote_chars: int) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) <= quote_chars:
+        return compact
+    return compact[: quote_chars - 1].rstrip() + "…"
+
+
+def _match_reason(question: str, quote: str, score: float | None, score_type: str) -> str:
+    q_tokens = list(dict.fromkeys(_tokenize(question)))
+    quote_tokens = set(_tokenize(quote))
+    matched = [token for token in q_tokens if token in quote_tokens][:6]
+    if matched:
+        return f"命中问题关键词：{'、'.join(_format_match_token(token) for token in matched)}"
+    if score is not None:
+        return f"按{_score_type_label(score_type)}排序进入 Top K，相关度 {score:.2f}"
+    return "由知识库检索排序命中。"
+
+
+def _format_match_token(token: str) -> str:
+    return token.upper() if re.fullmatch(r"[a-z0-9_]+", token) else token
+
+
+def _score_type_for_mode(mode: str, vector_store: Any = None) -> str:
+    store = str(vector_store or "local").lower()
+    if store == "chroma":
+        return "chroma_cosine_similarity"
+    return {
+        "keyword": "local_keyword_coverage",
+        "vector": "local_cosine_similarity",
+        "hybrid": "local_hybrid_relevance",
+        "none": "none",
+    }.get(mode, "local_hybrid_relevance")
+
+
+def _score_type_label(score_type: str) -> str:
+    labels = {
+        "local_keyword_coverage": "关键词覆盖度",
+        "local_cosine_similarity": "本地向量相似度",
+        "local_hybrid_relevance": "向量+关键词综合相关度",
+        "chroma_cosine_similarity": "BGE + Chroma 向量相似度",
+        "none": "未检索",
+    }
+    return labels.get(score_type, "检索相关度")
+
+
+def _normalize_score(value: Any, score_type: str = "") -> float | None:
+    score = _coerce_float(value)
+    if score is None:
+        return None
+    if score_type == "none":
+        return None
+    return round(max(0.0, min(1.0, score)), 4)
+
+
+def _similarity_from_distance(distance: float) -> float:
+    return round(max(0.0, min(1.0, 1.0 - (distance / 2.0))), 4)
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _relevance_value(score: float | None) -> str:
+    if score is None:
+        return "unknown"
+    if score >= 0.66:
+        return "high"
+    if score >= 0.38:
+        return "medium"
+    return "low"
+
+
+def _relevance_label(score: float | None) -> str:
+    return {
+        "high": "高相关",
+        "medium": "中相关",
+        "low": "低相关",
+        "unknown": "未评分",
+    }[_relevance_value(score)]
 
 
 def _retrieval_mode_label(mode: str) -> str:

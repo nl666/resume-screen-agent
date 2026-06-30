@@ -11,6 +11,7 @@ from .rag import (
     answer_freely,
     answer_with_context,
     chunk_text,
+    finalize_rag_result,
     load_documents,
 )
 
@@ -102,7 +103,7 @@ def query_chroma_knowledge_base(
     """Query local Chroma using BGE embeddings and return cited chunks."""
     if answer_mode == "free":
         payload = answer_freely(question, model=model)
-        payload["retrieval"] = {
+        retrieval = {
             "mode": "none",
             "vector_store": "none",
             "answer_mode": "free",
@@ -111,7 +112,7 @@ def query_chroma_knowledge_base(
             "collection": None,
             "chunk_count": 0,
         }
-        return payload
+        return finalize_rag_result(question, payload, retrieval, sources=[])
 
     result = retrieve_chroma(
         question=question,
@@ -133,11 +134,10 @@ def query_chroma_knowledge_base(
     else:
         payload = {
             "answer": f"已通过 BGE + Chroma 本地向量库检索到 {len(result.sources)} 个相关知识片段。打开“生成完整回答”后，可基于这些片段生成自然语言答案。",
-            "sources": result.sources,
             "confidence": "high" if result.sources else "low",
         }
 
-    payload["retrieval"] = {
+    retrieval = {
         "mode": "vector",
         "vector_store": "chroma",
         "answer_mode": answer_mode,
@@ -146,7 +146,7 @@ def query_chroma_knowledge_base(
         "collection": result.collection_name,
         "chunk_count": result.chunk_count,
     }
-    return payload
+    return finalize_rag_result(question, payload, retrieval, sources=result.sources)
 
 
 def retrieve_chroma(
@@ -208,6 +208,8 @@ def retrieve_chroma(
     sources: list[dict[str, Any]] = []
     for document, metadata, distance in zip(documents, metadatas, distances):
         metadata = metadata or {}
+        distance_value = round(float(distance), 6)
+        similarity = round(max(0.0, min(1.0, 1.0 - (distance_value / 2.0))), 4)
         chunk = Chunk(
             text=str(document or ""),
             chunk_id=str(metadata.get("chunk_id", "")),
@@ -219,7 +221,11 @@ def retrieve_chroma(
                 "file": chunk.source_file,
                 "chunk_id": chunk.chunk_id,
                 "quote": chunk.text[:300],
-                "distance": round(float(distance), 6),
+                "distance": distance_value,
+                "score": similarity,
+                "similarity": similarity,
+                "score_type": "chroma_cosine_similarity",
+                "vector_store": "chroma",
             }
         )
 

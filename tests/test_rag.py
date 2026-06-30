@@ -101,6 +101,11 @@ class RagTests(unittest.TestCase):
             self.assertEqual(payload["embedding"]["model"], EMBEDDING_MODEL_NAME)
             self.assertEqual(result["sources"][0]["file"], "rag.md")
             self.assertEqual(result["retrieval"]["mode"], "vector")
+            self.assertEqual(result["citations"][0]["citation_id"], "S1")
+            self.assertIn("score", result["citations"][0])
+            self.assertIn("match_reason", result["citations"][0])
+            self.assertEqual(result["citation_summary"]["total"], 1)
+            self.assertIn("引用来源", result["answer"])
 
     def test_answer_with_context_supports_mixed_mode_prompt(self) -> None:
         model = FakeChatModel()
@@ -120,8 +125,34 @@ class RagTests(unittest.TestCase):
         )
 
         self.assertEqual(result["sources"], [])
+        self.assertEqual(result["citations"], [])
+        self.assertEqual(result["citation_summary"]["total"], 0)
         self.assertEqual(result["retrieval"]["answer_mode"], "free")
         self.assertEqual(result["retrieval"]["mode"], "none")
+
+    def test_answer_with_context_is_enriched_with_citations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "rag.md").write_text(
+                "RAG 项目需要保留引用证据，包含 citation_id、chunk_id、相关度和匹配原因。",
+                encoding="utf-8",
+            )
+
+            result = query_knowledge_base(
+                "RAG 引用证据应该包含什么？",
+                knowledge_dir=root,
+                top_k=1,
+                use_llm=True,
+                model=FakeChatModel(),
+                answer_mode="strict",
+            )
+
+        citation = result["citations"][0]
+        self.assertEqual(citation["citation_id"], "S1")
+        self.assertEqual(citation["file"], "rag.md")
+        self.assertIn(citation["relevance"], {"high", "medium", "low"})
+        self.assertIn("rag.md", result["citation_summary"]["files"])
+        self.assertEqual(result["retrieval"]["citation_count"], 1)
 
 
 if __name__ == "__main__":
