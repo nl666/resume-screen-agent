@@ -328,6 +328,50 @@
       overflow: auto;
     }
 
+    .result-switcher {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 8px;
+      border: 1px solid rgba(221, 229, 238, .92);
+      border-radius: 8px;
+      background: rgba(247, 250, 252, .92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 24px rgba(22, 33, 52, .06);
+    }
+
+    .result-switcher.is-empty {
+      display: none;
+    }
+
+    .result-tab {
+      width: auto;
+      min-height: 38px;
+      margin: 0;
+      padding: 0 14px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+      white-space: nowrap;
+    }
+
+    .result-tab:hover:not(:disabled) {
+      background: #fff;
+      box-shadow: 0 6px 14px rgba(22, 33, 52, .08);
+    }
+
+    .result-tab.is-active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 8px 18px rgba(22, 130, 114, .18);
+    }
+
     .result-stack {
       display: grid;
       gap: 16px;
@@ -343,6 +387,10 @@
     }
 
     .module-panel.is-empty {
+      display: none;
+    }
+
+    .module-panel:not(.is-active) {
       display: none;
     }
 
@@ -830,6 +878,12 @@
 
       <div id="contentShell" class="content history-collapsed">
         <div class="result-pane">
+          <div id="resultSwitcher" class="result-switcher is-empty" role="tablist" aria-label="结果模块">
+            <button type="button" class="result-tab" data-result-tab="screen" role="tab" aria-selected="false" hidden>简历筛选</button>
+            <button type="button" class="result-tab" data-result-tab="rag" role="tab" aria-selected="false" hidden>知识库问答</button>
+            <button type="button" class="result-tab" data-result-tab="eval" role="tab" aria-selected="false" hidden>系统检查</button>
+          </div>
+
           <div id="workspacePlaceholder" class="empty-state workspace-placeholder">
             <strong>等待运行</strong>
             <span>选择左侧功能并运行后，简历筛选和知识库问答会分别显示在各自的结果区。</span>
@@ -899,10 +953,12 @@
 
   <script>
     const summaryBar = document.querySelector('#summaryBar');
+    const resultSwitcher = document.querySelector('#resultSwitcher');
     const workspacePlaceholder = document.querySelector('#workspacePlaceholder');
     const moduleViews = {
       screen: {
         panel: document.querySelector('#screenResultPanel'),
+        tab: document.querySelector('[data-result-tab="screen"]'),
         view: document.querySelector('#screenResultView'),
         state: document.querySelector('#screenResultState'),
         raw: document.querySelector('#screenRawBlock'),
@@ -910,6 +966,7 @@
       },
       rag: {
         panel: document.querySelector('#ragResultPanel'),
+        tab: document.querySelector('[data-result-tab="rag"]'),
         view: document.querySelector('#ragResultView'),
         state: document.querySelector('#ragResultState'),
         raw: document.querySelector('#ragRawBlock'),
@@ -917,6 +974,7 @@
       },
       eval: {
         panel: document.querySelector('#evalResultPanel'),
+        tab: document.querySelector('[data-result-tab="eval"]'),
         view: document.querySelector('#evalResultView'),
         state: document.querySelector('#evalResultState'),
         raw: document.querySelector('#evalRawBlock'),
@@ -935,6 +993,7 @@
     const appUrl = 'http://127.0.0.1:8000/';
 
     let activeModule = null;
+    const moduleData = { screen: null, rag: null, eval: null };
 
     function isFilePreview() {
       return location.protocol === 'file:';
@@ -958,10 +1017,25 @@
       return moduleViews[module] || moduleViews.screen;
     }
 
+    function selectModule(module) {
+      activeModule = module;
+      Object.entries(moduleViews).forEach(([key, item]) => {
+        const isReady = !item.panel.classList.contains('is-empty');
+        const isActive = key === module && isReady;
+        item.panel.classList.toggle('is-active', isActive);
+        item.tab.classList.toggle('is-active', isActive);
+        item.tab.setAttribute('aria-selected', String(isActive));
+      });
+      if (moduleData[module]) updateMetrics(moduleData[module]);
+    }
+
     function revealModule(module) {
       const target = viewFor(module);
       target.panel.classList.remove('is-empty');
+      target.tab.hidden = false;
+      resultSwitcher.classList.remove('is-empty');
       workspacePlaceholder.hidden = true;
+      selectModule(module);
       return target;
     }
 
@@ -997,6 +1071,7 @@
 
     function show(data, module) {
       const targetModule = module || moduleForData(data);
+      moduleData[targetModule] = data;
       revealModule(targetModule);
       writeRaw(targetModule, data);
       updateMetrics(data);
@@ -1378,6 +1453,9 @@
       input.addEventListener('change', updateScreenMode);
     });
     agentMode.addEventListener('change', updateAgentModeHint);
+    document.querySelectorAll('[data-result-tab]').forEach(tab => {
+      tab.addEventListener('click', () => selectModule(tab.dataset.resultTab));
+    });
 
     document.querySelector('#screenForm').addEventListener('submit', event => {
       event.preventDefault();
