@@ -680,6 +680,82 @@
       gap: 8px;
     }
 
+    .progress-card {
+      display: grid;
+      gap: 16px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .progress-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .progress-head h3 {
+      margin: 0 0 7px;
+      font-size: 19px;
+    }
+
+    .progress-head p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .progress-percent {
+      color: var(--accent);
+      font-size: 28px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .progress-track {
+      height: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8f7f3;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width .24s ease;
+    }
+
+    .progress-meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .progress-meta div {
+      padding: 12px;
+      border: 1px solid rgba(0, 184, 148, .20);
+      border-radius: 12px;
+      background: #f5fffb;
+    }
+
+    .progress-meta span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .progress-meta strong {
+      font-size: 17px;
+      overflow-wrap: anywhere;
+    }
+
     .score-ring {
       width: 86px;
       height: 86px;
@@ -932,7 +1008,8 @@
       }
 
       .detail-grid,
-      .decision {
+      .decision,
+      .progress-meta {
         grid-template-columns: 1fr;
       }
 
@@ -1169,6 +1246,7 @@
     const appUrl = 'http://127.0.0.1:8000/';
 
     let activeModule = null;
+    let screenTaskTimer = null;
     const moduleData = { screen: null, rag: null, eval: null };
 
     function isFilePreview() {
@@ -1605,6 +1683,127 @@
       }
     }
 
+    function clearScreenTaskTimer() {
+      if (screenTaskTimer) {
+        clearTimeout(screenTaskTimer);
+        screenTaskTimer = null;
+      }
+    }
+
+    function taskStatusLabel(value) {
+      const map = {
+        queued: '排队中',
+        running: '处理中',
+        completed: '已完成',
+        failed: '失败'
+      };
+      return map[value] || value || '-';
+    }
+
+    function updateTaskMetrics(task) {
+      const progress = task.progress || {};
+      summaryBar.classList.remove('is-empty');
+      document.querySelector('#metricName').textContent = '批量任务';
+      document.querySelector('#metricScore').textContent = `${progress.processed ?? 0}/${progress.total ?? 0}`;
+      document.querySelector('#metricLevel').textContent = taskStatusLabel(task.status);
+      document.querySelector('#metricGate').textContent = `成功 ${progress.ok ?? 0} / 失败 ${progress.failed ?? 0}`;
+    }
+
+    function renderTaskProgress(task) {
+      moduleData.screen = null;
+      const target = revealModule('screen');
+      const progress = task.progress || {};
+      const percent = Math.max(0, Math.min(100, Number(progress.percent || 0)));
+      const statusTone = task.status === 'failed' ? 'bad' : task.status === 'completed' ? 'good' : '';
+      setModuleState('screen', taskStatusLabel(task.status), statusTone);
+      updateTaskMetrics(task);
+      writeRaw('screen', task);
+      target.view.innerHTML = `
+        <div class="progress-card">
+          <div class="progress-head">
+            <div>
+              <h3>批量筛选任务</h3>
+              <p>${esc(task.status === 'completed' ? '批量筛选已完成，正在整理结果。' : '后台正在逐份筛选简历，页面会自动刷新进度。')}</p>
+            </div>
+            <div class="progress-percent">${percent}%</div>
+          </div>
+          <div class="progress-track" aria-label="批量筛选进度">
+            <div class="progress-fill" style="width: ${percent}%"></div>
+          </div>
+          <div class="progress-meta">
+            <div><span>总数</span><strong>${esc(progress.total ?? 0)}</strong></div>
+            <div><span>已处理</span><strong>${esc(progress.processed ?? 0)}</strong></div>
+            <div><span>成功</span><strong>${esc(progress.ok ?? 0)}</strong></div>
+            <div><span>失败</span><strong>${esc(progress.failed ?? 0)}</strong></div>
+          </div>
+          <div class="panel wide">
+            <h3>当前文件</h3>
+            <p class="quote">${esc(progress.current_file || '等待开始')}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    async function startBatchScreenTask(body, totalFiles) {
+      if (isFilePreview()) {
+        showFilePreviewWarning();
+        return;
+      }
+      clearScreenTaskTimer();
+      screenSubmit.disabled = true;
+      renderTaskProgress({
+        status: 'queued',
+        progress: { total: totalFiles, processed: 0, ok: 0, failed: 0, percent: 0, current_file: '' }
+      });
+      try {
+        const response = await fetch('/api/batch-screen-async', { method: 'POST', body });
+        const task = await response.json();
+        if (!response.ok) throw new Error(task.detail || response.statusText);
+        renderTaskProgress(task);
+        pollScreenTask(task.task_id);
+      } catch (error) {
+        screenSubmit.disabled = false;
+        showModuleMessage('screen', '批量任务创建失败', String(error), '失败', 'bad');
+        writeRaw('screen', String(error));
+      }
+    }
+
+    function pollScreenTask(taskId) {
+      const tick = async () => {
+        try {
+          const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+          const task = await response.json();
+          if (!response.ok) throw new Error(task.detail || response.statusText);
+          renderTaskProgress(task);
+
+          if (task.status === 'completed') {
+            clearScreenTaskTimer();
+            screenSubmit.disabled = false;
+            show(task.result, 'screen');
+            writeRaw('screen', task);
+            return;
+          }
+
+          if (task.status === 'failed') {
+            clearScreenTaskTimer();
+            screenSubmit.disabled = false;
+            showModuleMessage('screen', '批量任务失败', task.error || '后台任务执行失败。', '失败', 'bad');
+            writeRaw('screen', task);
+            return;
+          }
+
+          screenTaskTimer = setTimeout(tick, 1000);
+        } catch (error) {
+          clearScreenTaskTimer();
+          screenSubmit.disabled = false;
+          showModuleMessage('screen', '进度查询失败', String(error), '失败', 'bad');
+          writeRaw('screen', String(error));
+        }
+      };
+
+      screenTaskTimer = setTimeout(tick, 800);
+    }
+
     function currentScreenMode() {
       return document.querySelector('input[name="screen_mode"]:checked').value;
     }
@@ -1711,7 +1910,7 @@
         requestJson('/api/screen-resume', { method: 'POST', body }, 'screen');
       } else {
         files.forEach(file => body.append('files', file));
-        requestJson('/api/batch-screen', { method: 'POST', body }, 'screen');
+        startBatchScreenTask(body, files.length);
       }
     });
 

@@ -4,7 +4,10 @@ import json
 import re
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from .eval import DEFAULT_EVAL_CASES, run_eval_suite
@@ -17,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 WEB_RESULTS_DIR = ROOT / "results" / "web"
 WEB_UPLOADS_DIR = ROOT / "data" / "uploads"
 WEB_STATIC_DIR = ROOT / "web" / "static"
+TASKS: dict[str, dict[str, Any]] = {}
+TASK_LOCK = Lock()
+TASK_EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 
 def create_app() -> Any:
@@ -84,6 +90,7 @@ def create_app() -> Any:
         redact: bool = Form(True),
         max_steps: int = Form(12),
     ) -> dict[str, Any]:
+        _validate_screen_mode(mode)
         batch_id = _make_result_id("batch", "resumes")
         batch_dir = WEB_RESULTS_DIR / batch_id
         batch_dir.mkdir(parents=True, exist_ok=True)
@@ -93,12 +100,7 @@ def create_app() -> Any:
             saved_path = _save_upload(file, batch_id=batch_id)
             out_path = batch_dir / f"{saved_path.stem}.json"
             try:
-                if mode == "fixed":
-                    result = run_tool_calling_workflow(saved_path, out_path=out_path, redact=redact)
-                elif mode == "dynamic":
-                    result = run_dynamic_tool_calling_agent(saved_path, out_path=out_path, redact=redact, max_steps=max_steps)
-                else:
-                    raise ValueError("mode must be dynamic or fixed")
+                result = _screen_saved_resume(saved_path, out_path, mode, redact, max_steps)
                 items.append(
                     {
                         "source_file": saved_path.name,
@@ -120,6 +122,34 @@ def create_app() -> Any:
         batch_report = {"batch_id": batch_id, "summary": summary, "items": items}
         _write_json(WEB_RESULTS_DIR / f"{batch_id}.json", batch_report)
         return batch_report
+
+    @app.post("/api/batch-screen-async")
+    def batch_screen_async(
+        files: list[UploadFile] = File(...),
+        mode: str = Form("dynamic"),
+        redact: bool = Form(True),
+        max_steps: int = Form(12),
+    ) -> dict[str, Any]:
+        try:
+            _validate_screen_mode(mode)
+            if not files:
+                raise ValueError("files are required")
+            batch_id = _make_result_id("batch", "resumes")
+            saved_paths = [_save_upload(file, batch_id=batch_id) for file in files]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        task_id = _make_result_id("task", "batch")
+        task = _create_batch_task(task_id, batch_id, saved_paths)
+        TASK_EXECUTOR.submit(_run_batch_screen_task, task_id, batch_id, saved_paths, mode, redact, max_steps)
+        return task
+
+    @app.get("/api/tasks/{task_id}")
+    def get_task(task_id: str) -> dict[str, Any]:
+        task = _get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+        return task
 
     @app.post("/api/rag-query")
     async def rag_query(payload: dict[str, Any]) -> dict[str, Any]:
@@ -182,6 +212,150 @@ def create_app() -> Any:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return app
+
+
+def _validate_screen_mode(mode: str) -> None:
+    if mode not in {"dynamic", "fixed"}:
+        raise ValueError("mode must be dynamic or fixed")
+
+
+def _screen_saved_resume(saved_path: Path, out_path: Path, mode: str, redact: bool, max_steps: int) -> dict[str, Any]:
+    if mode == "fixed":
+        return run_tool_calling_workflow(saved_path, out_path=out_path, redact=redact)
+    if mode == "dynamic":
+        return run_dynamic_tool_calling_agent(saved_path, out_path=out_path, redact=redact, max_steps=max_steps)
+    raise ValueError("mode must be dynamic or fixed")
+
+
+def _create_batch_task(task_id: str, batch_id: str, saved_paths: list[Path]) -> dict[str, Any]:
+    now = int(time.time())
+    task = {
+        "task_id": task_id,
+        "batch_id": batch_id,
+        "kind": "batch_screen",
+        "status": "queued",
+        "created_at": now,
+        "updated_at": now,
+        "result_file": str(WEB_RESULTS_DIR / f"{batch_id}.json"),
+        "progress": {
+            "total": len(saved_paths),
+            "processed": 0,
+            "ok": 0,
+            "failed": 0,
+            "percent": 0,
+            "current_file": "",
+        },
+        "items": [],
+    }
+    with TASK_LOCK:
+        TASKS[task_id] = task
+    return deepcopy(task)
+
+
+def _get_task(task_id: str) -> dict[str, Any] | None:
+    with TASK_LOCK:
+        task = TASKS.get(task_id)
+        return deepcopy(task) if task else None
+
+
+def _update_task(task_id: str, **updates: Any) -> dict[str, Any]:
+    with TASK_LOCK:
+        task = TASKS[task_id]
+        task.update(updates)
+        task["updated_at"] = int(time.time())
+        return deepcopy(task)
+
+
+def _set_task_progress(
+    task_id: str,
+    *,
+    total: int,
+    processed: int,
+    ok: int,
+    failed: int,
+    current_file: str = "",
+    items: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    percent = int((processed / total) * 100) if total else 100
+    progress = {
+        "total": total,
+        "processed": processed,
+        "ok": ok,
+        "failed": failed,
+        "percent": min(100, max(0, percent)),
+        "current_file": current_file,
+    }
+    updates: dict[str, Any] = {"progress": progress}
+    if items is not None:
+        updates["items"] = deepcopy(items)
+    return _update_task(task_id, **updates)
+
+
+def _run_batch_screen_task(
+    task_id: str,
+    batch_id: str,
+    saved_paths: list[Path],
+    mode: str,
+    redact: bool,
+    max_steps: int,
+) -> None:
+    total = len(saved_paths)
+    batch_dir = WEB_RESULTS_DIR / batch_id
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    items: list[dict[str, Any]] = []
+    ok_count = 0
+    failed_count = 0
+
+    try:
+        _update_task(task_id, status="running")
+        for index, saved_path in enumerate(saved_paths, start=1):
+            _set_task_progress(
+                task_id,
+                total=total,
+                processed=index - 1,
+                ok=ok_count,
+                failed=failed_count,
+                current_file=saved_path.name,
+                items=items,
+            )
+            out_path = batch_dir / f"{saved_path.stem}.json"
+            try:
+                result = _screen_saved_resume(saved_path, out_path, mode, redact, max_steps)
+                item = {
+                    "source_file": saved_path.name,
+                    "result_file": str(out_path),
+                    "ok": True,
+                    "summary": _summarize_screening_result(result),
+                }
+                ok_count += 1
+            except Exception as exc:  # noqa: BLE001 - batch jobs should continue and record per-file errors.
+                item = {"source_file": saved_path.name, "ok": False, "error": str(exc)}
+                _write_json(out_path, item)
+                failed_count += 1
+            items.append(item)
+            _set_task_progress(
+                task_id,
+                total=total,
+                processed=index,
+                ok=ok_count,
+                failed=failed_count,
+                current_file=saved_path.name,
+                items=items,
+            )
+
+        summary = {"total": total, "ok": ok_count, "failed": failed_count}
+        batch_report = {"batch_id": batch_id, "summary": summary, "items": items}
+        result_file = WEB_RESULTS_DIR / f"{batch_id}.json"
+        _write_json(result_file, batch_report)
+        _update_task(
+            task_id,
+            status="completed",
+            result_file=str(result_file),
+            summary=summary,
+            result=batch_report,
+        )
+    except Exception as exc:  # noqa: BLE001 - preserve task state for UI instead of dropping the failure.
+        _update_task(task_id, status="failed", error=str(exc))
 
 
 def list_result_files() -> list[dict[str, Any]]:
