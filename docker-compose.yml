@@ -1,0 +1,17 @@
+services:
+  resume-screen-agent:
+    build:
+      context: .
+      args:
+        INSTALL_BGE_CHROMA: ${INSTALL_BGE_CHROMA:-false}
+    image: resume-screen-agent:local
+    container_name: resume-screen-agent
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./results:/app/results
+      - ./logs:/app/logs
+    restart: unless-stopped

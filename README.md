@@ -67,7 +67,10 @@ resume-screen-agent/
   web/
     static/
       index.html
+  .dockerignore
   .env.example
+  Dockerfile
+  docker-compose.yml
   requirements.txt
   requirements-bge-chroma.txt
 ```
@@ -380,6 +383,66 @@ result_name：可回放的结果文件名
 summary：分数、引用数、通过率等关键摘要
 error：失败原因摘要
 ```
+
+## Docker 部署
+
+准备配置文件：
+
+```powershell
+copy .env.example .env
+```
+
+然后在 `.env` 里填写你的模型配置。当前项目会通过 Compose 把 `.env` 注入容器环境，但 `.env` 不会被打进镜像。
+
+如果本机已经用 Python 启动了 `http://127.0.0.1:8000`，先停止原来的后端服务，避免端口冲突。
+
+启动轻量版服务：
+
+```powershell
+docker compose up --build
+```
+
+浏览器打开：
+
+```text
+http://127.0.0.1:8000
+```
+
+后台运行：
+
+```powershell
+docker compose up -d --build
+```
+
+查看容器日志：
+
+```powershell
+docker compose logs -f
+```
+
+停止服务：
+
+```powershell
+docker compose down
+```
+
+容器会挂载这些本地目录，重建镜像后数据不会丢：
+
+```text
+./data    -> /app/data
+./results -> /app/results
+./logs    -> /app/logs
+```
+
+默认镜像只安装 `requirements.txt`，适合先跑 FastAPI、简历筛选、本地轻量 RAG。如果要把 BGE + Chroma 也装进镜像：
+
+```powershell
+$env:INSTALL_BGE_CHROMA="true"
+docker compose build --no-cache
+docker compose up
+```
+
+第一次构建 BGE + Chroma 会明显更慢，镜像也会更大。
 
 ## 本地校验
 
