@@ -103,28 +103,53 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
-      gap: 18px;
+      grid-template-columns: 1fr;
+      align-content: start;
+      gap: 20px;
       min-height: calc(100vh - 72px);
-      padding: 18px;
+      padding: 22px;
     }
 
     aside {
-      border: 1px solid rgba(221, 229, 238, .88);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, .88);
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    aside > section {
+      min-width: 0;
+      padding: 20px;
+      border: 1px solid rgba(216, 238, 232, .92);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .90);
       box-shadow: var(--shadow-soft);
-      padding: 14px;
-      overflow: auto;
-      min-height: 0;
     }
 
-    section {
-      padding: 18px 14px;
-      border-bottom: 1px solid var(--line);
+    aside > section:nth-child(1),
+    aside > section:nth-child(2) {
+      min-height: 560px;
     }
 
-    section:last-child { border-bottom: 0; }
+    aside > section:nth-child(3) {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 84px;
+    }
+
+    aside > section:nth-child(3) h2 {
+      margin: 0;
+    }
+
+    aside > section:nth-child(3) button {
+      width: auto;
+      min-width: 180px;
+      margin-top: 0;
+    }
 
     h2 {
       margin: 0 0 14px;
@@ -377,6 +402,8 @@
     }
 
     .workspace {
+      width: min(1180px, 100%);
+      margin: 0 auto 22px;
       min-width: 0;
       display: grid;
       grid-template-rows: auto 1fr;
@@ -861,6 +888,21 @@
 
       aside {
         max-height: none;
+        grid-template-columns: 1fr;
+      }
+
+      aside > section:nth-child(1),
+      aside > section:nth-child(2) {
+        min-height: 0;
+      }
+
+      aside > section:nth-child(3) {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      aside > section:nth-child(3) button {
+        width: 100%;
       }
 
       .screen-toolbar {
@@ -1015,7 +1057,7 @@
 
           <div id="workspacePlaceholder" class="empty-state workspace-placeholder">
             <strong>等待运行</strong>
-            <span>选择左侧功能并运行后，简历筛选和知识库问答会分别显示在各自的结果区。</span>
+            <span>选择上方功能并运行后，输出结果会在这里展示。</span>
           </div>
 
           <div class="result-stack">
