@@ -56,6 +56,39 @@ class WebAppHelperTests(unittest.TestCase):
             finally:
                 web_app.WEB_RESULTS_DIR = old_dir
 
+    def test_operation_log_records_and_lists_recent_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            old_log_dir = web_app.WEB_LOG_DIR
+            old_app_log = web_app.WEB_APP_LOG_PATH
+            old_operations = web_app.WEB_OPERATIONS_PATH
+            old_results = web_app.WEB_RESULTS_DIR
+            web_app.WEB_LOG_DIR = Path(tmp) / "logs"
+            web_app.WEB_APP_LOG_PATH = web_app.WEB_LOG_DIR / "web_app.log"
+            web_app.WEB_OPERATIONS_PATH = web_app.WEB_LOG_DIR / "operations.jsonl"
+            web_app.WEB_RESULTS_DIR = Path(tmp) / "results"
+            try:
+                result_path = web_app.WEB_RESULTS_DIR / "sample.json"
+                web_app._write_json(result_path, {"ok": True})
+                event = web_app._record_operation(
+                    operation_id="op_test",
+                    kind="rag_query",
+                    status="succeeded",
+                    message="知识库问答完成",
+                    result_path=result_path,
+                    summary={"confidence": "high"},
+                )
+                items = web_app.list_operation_events()
+            finally:
+                web_app._close_app_logging()
+                web_app.WEB_LOG_DIR = old_log_dir
+                web_app.WEB_APP_LOG_PATH = old_app_log
+                web_app.WEB_OPERATIONS_PATH = old_operations
+                web_app.WEB_RESULTS_DIR = old_results
+
+        self.assertEqual(event["result_name"], "sample.json")
+        self.assertEqual(items[0]["operation_id"], "op_test")
+        self.assertEqual(items[0]["summary"]["confidence"], "high")
+
 
 @unittest.skipUnless(importlib.util.find_spec("fastapi"), "fastapi is not installed")
 class WebAppFastApiTests(unittest.TestCase):
@@ -68,6 +101,36 @@ class WebAppFastApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
+        self.assertIn("operation_log", response.json())
+
+    def test_operations_endpoint_returns_recent_events(self) -> None:
+        from fastapi.testclient import TestClient
+
+        with tempfile.TemporaryDirectory() as tmp:
+            old_log_dir = web_app.WEB_LOG_DIR
+            old_app_log = web_app.WEB_APP_LOG_PATH
+            old_operations = web_app.WEB_OPERATIONS_PATH
+            web_app.WEB_LOG_DIR = Path(tmp) / "logs"
+            web_app.WEB_APP_LOG_PATH = web_app.WEB_LOG_DIR / "web_app.log"
+            web_app.WEB_OPERATIONS_PATH = web_app.WEB_LOG_DIR / "operations.jsonl"
+            try:
+                web_app._record_operation(
+                    operation_id="op_api",
+                    kind="run_eval",
+                    status="started",
+                    message="系统效果检查开始",
+                )
+                app = web_app.create_app()
+                client = TestClient(app)
+                response = client.get("/api/operations")
+            finally:
+                web_app._close_app_logging()
+                web_app.WEB_LOG_DIR = old_log_dir
+                web_app.WEB_APP_LOG_PATH = old_app_log
+                web_app.WEB_OPERATIONS_PATH = old_operations
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"][0]["operation_id"], "op_api")
 
     def test_screen_resume_upload_endpoint(self) -> None:
         from fastapi.testclient import TestClient
@@ -75,8 +138,14 @@ class WebAppFastApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             old_results = web_app.WEB_RESULTS_DIR
             old_uploads = web_app.WEB_UPLOADS_DIR
+            old_log_dir = web_app.WEB_LOG_DIR
+            old_app_log = web_app.WEB_APP_LOG_PATH
+            old_operations = web_app.WEB_OPERATIONS_PATH
             web_app.WEB_RESULTS_DIR = Path(tmp) / "results"
             web_app.WEB_UPLOADS_DIR = Path(tmp) / "uploads"
+            web_app.WEB_LOG_DIR = Path(tmp) / "logs"
+            web_app.WEB_APP_LOG_PATH = web_app.WEB_LOG_DIR / "web_app.log"
+            web_app.WEB_OPERATIONS_PATH = web_app.WEB_LOG_DIR / "operations.jsonl"
             try:
                 app = web_app.create_app()
                 client = TestClient(app)
@@ -87,11 +156,16 @@ class WebAppFastApiTests(unittest.TestCase):
                     data={"mode": "dynamic", "redact": "true", "max_steps": "12"},
                 )
             finally:
+                web_app._close_app_logging()
                 web_app.WEB_RESULTS_DIR = old_results
                 web_app.WEB_UPLOADS_DIR = old_uploads
+                web_app.WEB_LOG_DIR = old_log_dir
+                web_app.WEB_APP_LOG_PATH = old_app_log
+                web_app.WEB_OPERATIONS_PATH = old_operations
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
+        self.assertIn("operation_id", body)
         self.assertEqual(body["result"]["agent_type"], "dynamic_tool_calling_resume_screen_agent")
         self.assertIn("final_report", body["result"])
 
@@ -115,8 +189,14 @@ class WebAppFastApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             old_results = web_app.WEB_RESULTS_DIR
             old_uploads = web_app.WEB_UPLOADS_DIR
+            old_log_dir = web_app.WEB_LOG_DIR
+            old_app_log = web_app.WEB_APP_LOG_PATH
+            old_operations = web_app.WEB_OPERATIONS_PATH
             web_app.WEB_RESULTS_DIR = Path(tmp) / "results"
             web_app.WEB_UPLOADS_DIR = Path(tmp) / "uploads"
+            web_app.WEB_LOG_DIR = Path(tmp) / "logs"
+            web_app.WEB_APP_LOG_PATH = web_app.WEB_LOG_DIR / "web_app.log"
+            web_app.WEB_OPERATIONS_PATH = web_app.WEB_LOG_DIR / "operations.jsonl"
             with web_app.TASK_LOCK:
                 web_app.TASKS.clear()
             try:
@@ -142,9 +222,14 @@ class WebAppFastApiTests(unittest.TestCase):
                         if task["status"] == "completed":
                             break
                         time.sleep(0.05)
+                    operations_response = client.get("/api/operations")
             finally:
+                web_app._close_app_logging()
                 web_app.WEB_RESULTS_DIR = old_results
                 web_app.WEB_UPLOADS_DIR = old_uploads
+                web_app.WEB_LOG_DIR = old_log_dir
+                web_app.WEB_APP_LOG_PATH = old_app_log
+                web_app.WEB_OPERATIONS_PATH = old_operations
                 with web_app.TASK_LOCK:
                     web_app.TASKS.clear()
 
@@ -153,6 +238,9 @@ class WebAppFastApiTests(unittest.TestCase):
         self.assertEqual(task["progress"]["percent"], 100)
         self.assertEqual(task["summary"], {"total": 2, "ok": 2, "failed": 0})
         self.assertEqual(len(task["result"]["items"]), 2)
+        operation_kinds = [item["kind"] for item in operations_response.json()["items"]]
+        self.assertIn("batch_screen_async", operation_kinds)
+        self.assertIn("batch_screen_file", operation_kinds)
 
 
 if __name__ == "__main__":

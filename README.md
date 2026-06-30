@@ -332,10 +332,12 @@ http://127.0.0.1:8000
 GET  /api/health
 POST /api/screen-resume
 POST /api/batch-screen
+POST /api/batch-screen-async
 POST /api/rag-query
 POST /api/run-eval
 GET  /api/results
 GET  /api/result?name=...
+GET  /api/operations
 ```
 
 页面支持：
@@ -346,6 +348,29 @@ GET  /api/result?name=...
 RAG 知识库问答
 Eval 回归测试
 历史结果查看
+操作记录查看
+批量任务进度追踪
+RAG 引用证据展示
+```
+
+日志与操作记录：
+
+```text
+logs/web_app.log：后端运行日志，主要用于排查异常和服务状态。
+logs/operations.jsonl：结构化操作记录，每行一个 JSON 事件。
+```
+
+操作记录会记录：
+
+```text
+operation_id：一次操作的唯一编号
+kind：操作类型，例如 screen_resume、batch_screen_async、rag_query、run_eval
+status：started / queued / running / succeeded / failed
+message：中文操作说明
+duration_ms：耗时
+result_name：可回放的结果文件名
+summary：分数、引用数、通过率等关键摘要
+error：失败原因摘要
 ```
 
 ## 本地校验

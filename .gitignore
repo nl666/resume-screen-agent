@@ -16,6 +16,8 @@ results/*.txt
 results/*.log
 results/**/*.json
 results/**/*.log
+logs/*
+!logs/.gitkeep
 data/resumes/*
 !data/resumes/.gitkeep
 data/uploads/*

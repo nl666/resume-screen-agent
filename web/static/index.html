@@ -1028,6 +1028,36 @@
       gap: 10px;
     }
 
+    .history-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+      padding: 4px;
+      border: 1px solid rgba(0, 184, 148, .18);
+      border-radius: 999px;
+      background: #eafff8;
+    }
+
+    .history-tabs button {
+      min-height: 32px;
+      margin: 0;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 999px;
+      color: var(--accent-dark);
+      background: transparent;
+      box-shadow: none;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .history-tabs button.is-active {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(0, 184, 148, .18);
+    }
+
     .history-item {
       width: 100%;
       margin: 0;
@@ -1039,6 +1069,11 @@
       text-align: left;
       font-weight: 500;
       box-shadow: none;
+    }
+
+    .history-item:disabled {
+      cursor: default;
+      opacity: 1;
     }
 
     .history-item:hover:not(:disabled) {
@@ -1066,6 +1101,49 @@
 
     .history-summary span:nth-child(odd) {
       color: #8491a3;
+    }
+
+    .operation-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .operation-head strong {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
+    }
+
+    .operation-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: var(--accent-dark);
+      background: #eafff8;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .operation-status.good {
+      color: var(--good);
+      background: #f0fbf5;
+    }
+
+    .operation-status.bad {
+      color: var(--bad);
+      background: #fff3f1;
+    }
+
+    .operation-message {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     @media (max-width: 980px) {
@@ -1320,6 +1398,10 @@
             </div>
           </div>
           <div id="historyBody" class="history-body">
+            <div class="history-tabs" role="tablist" aria-label="历史记录类型">
+              <button type="button" class="is-active" data-history-tab="results" role="tab" aria-selected="true">结果文件</button>
+              <button type="button" data-history-tab="operations" role="tab" aria-selected="false">操作记录</button>
+            </div>
             <div id="history" class="history-list"></div>
           </div>
           <button id="historyExpand" type="button" class="history-rail" aria-expanded="false" aria-controls="historyBody">历史</button>
@@ -1372,9 +1454,11 @@
     const contentShell = document.querySelector('#contentShell');
     const historyToggle = document.querySelector('#historyToggle');
     const historyExpand = document.querySelector('#historyExpand');
+    const historyTabs = Array.from(document.querySelectorAll('[data-history-tab]'));
     const appUrl = 'http://127.0.0.1:8000/';
 
     let activeModule = null;
+    let activeHistoryTab = 'results';
     let screenTaskTimer = null;
     const moduleData = { screen: null, rag: null, eval: null };
 
@@ -2135,6 +2219,17 @@
     document.querySelector('#refreshButton').addEventListener('click', loadHistory);
     historyToggle.addEventListener('click', () => setHistoryCollapsed(true));
     historyExpand.addEventListener('click', () => setHistoryCollapsed(false));
+    historyTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeHistoryTab = tab.dataset.historyTab;
+        historyTabs.forEach(item => {
+          const isActive = item.dataset.historyTab === activeHistoryTab;
+          item.classList.toggle('is-active', isActive);
+          item.setAttribute('aria-selected', String(isActive));
+        });
+        loadHistory();
+      });
+    });
 
     function setHistoryCollapsed(value) {
       contentShell.classList.toggle('history-collapsed', value);
@@ -2148,10 +2243,28 @@
         history.innerHTML = '<p class="quote">启动后端服务后可查看历史结果。</p>';
         return;
       }
-      const response = await fetch('/api/results');
+      const endpoint = activeHistoryTab === 'operations' ? '/api/operations?limit=80' : '/api/results';
+      const response = await fetch(endpoint);
       const data = await response.json();
+      if (!response.ok) {
+        history.innerHTML = `<p class="quote">加载失败：${esc(data.detail || response.statusText)}</p>`;
+        return;
+      }
+      if (activeHistoryTab === 'operations') {
+        renderOperationHistory(data.items || []);
+      } else {
+        renderResultHistory(data.items || []);
+      }
+    }
+
+    function renderResultHistory(items) {
+      const history = document.querySelector('#history');
       history.innerHTML = '';
-      data.items.slice(0, 30).forEach(item => {
+      if (!items.length) {
+        history.innerHTML = '<p class="quote">暂无结果文件</p>';
+        return;
+      }
+      items.slice(0, 30).forEach(item => {
         const button = document.createElement('button');
         button.className = 'history-item';
         button.type = 'button';
@@ -2163,6 +2276,51 @@
         });
         history.appendChild(button);
       });
+    }
+
+    function renderOperationHistory(items) {
+      const history = document.querySelector('#history');
+      history.innerHTML = '';
+      if (!items.length) {
+        history.innerHTML = '<p class="quote">暂无操作记录</p>';
+        return;
+      }
+      items.forEach(item => {
+        const button = document.createElement('button');
+        button.className = 'history-item operation-item';
+        button.type = 'button';
+        button.innerHTML = `
+          <div class="operation-head">
+            <strong>${esc(operationKindLabel(item.kind))}</strong>
+            <span class="operation-status ${operationStatusTone(item.status)}">${esc(operationStatusLabel(item.status))}</span>
+          </div>
+          <span class="operation-message">${esc(item.message || '')}</span>
+          <small>${esc(formatTime(item.created_at))}${item.duration_ms !== undefined ? ` · ${esc(item.duration_ms)} ms` : ''}</small>
+        `;
+        button.appendChild(historySummary(operationSummary(item)));
+        if (item.result_name) {
+          button.addEventListener('click', async () => {
+            const res = await fetch('/api/result?name=' + encodeURIComponent(item.result_name));
+            show(await res.json());
+          });
+        } else {
+          button.disabled = true;
+        }
+        history.appendChild(button);
+      });
+    }
+
+    function operationSummary(item) {
+      const summary = item.summary || {};
+      const details = item.details || {};
+      return {
+        operation_id: item.operation_id || '',
+        result_name: item.result_name || '',
+        source_file: details.source_file || details.uploaded_file || '',
+        total: summary.total ?? details.total ?? details.file_count ?? '',
+        failed: summary.failed ?? '',
+        error: item.error || ''
+      };
     }
 
     function historySummary(summary) {
@@ -2196,12 +2354,53 @@
         total: '总数',
         ok: '成功',
         failed: '失败',
+        operation_id: '操作ID',
+        result_name: '结果',
+        source_file: '文件',
+        error: '错误',
+        citations: '引用',
+        answer_mode: '回答模式',
         passed_cases: '通过样例',
         total_cases: '样例总数',
         passed_assertions: '通过检查',
         total_assertions: '检查总数'
       };
       return map[key] || key;
+    }
+
+    function operationKindLabel(value) {
+      const map = {
+        screen_resume: '单份简历筛选',
+        batch_screen: '同步批量筛选',
+        batch_screen_async: '异步批量筛选',
+        batch_screen_file: '批量单文件处理',
+        rag_query: '知识库问答',
+        run_eval: '系统效果检查'
+      };
+      return map[value] || value || '-';
+    }
+
+    function operationStatusLabel(value) {
+      const map = {
+        started: '开始',
+        queued: '排队',
+        running: '运行中',
+        succeeded: '成功',
+        failed: '失败'
+      };
+      return map[value] || value || '-';
+    }
+
+    function operationStatusTone(value) {
+      if (value === 'succeeded') return 'good';
+      if (value === 'failed') return 'bad';
+      return '';
+    }
+
+    function formatTime(value) {
+      const timestamp = Number(value);
+      if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+      return new Date(timestamp * 1000).toLocaleString();
     }
 
     async function checkHealth() {
