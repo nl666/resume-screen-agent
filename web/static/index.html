@@ -6,22 +6,22 @@
   <title>Resume Screen Agent</title>
   <style>
     :root {
-      --bg: #f4f7fb;
+      --bg: #f3fbf8;
       --panel: #ffffff;
-      --panel-soft: #f8fbfc;
+      --panel-soft: #f5fffb;
       --ink: #151821;
       --muted: #6e7786;
-      --line: #dde5ee;
-      --line-strong: #c7d2df;
-      --accent: #0f8b8d;
-      --accent-dark: #0c6268;
-      --accent-2: #5b5fe8;
-      --accent-warm: #ff7959;
+      --line: #d8eee8;
+      --line-strong: #a9dcd0;
+      --accent: #00b894;
+      --accent-dark: #00896f;
+      --accent-2: #1d7afc;
+      --accent-warm: #ff5f45;
       --warn: #b7791f;
       --bad: #c24132;
-      --good: #16824f;
-      --shadow: 0 14px 34px rgba(22, 33, 52, .08);
-      --shadow-soft: 0 8px 20px rgba(22, 33, 52, .06);
+      --good: #00a76f;
+      --shadow: 0 18px 42px rgba(0, 137, 111, .12);
+      --shadow-soft: 0 10px 24px rgba(0, 137, 111, .09);
     }
 
     * { box-sizing: border-box; }
@@ -29,8 +29,8 @@
       margin: 0;
       min-height: 100vh;
       background:
-        linear-gradient(135deg, rgba(15, 139, 141, .09), transparent 32%),
-        linear-gradient(315deg, rgba(255, 121, 89, .10), transparent 28%),
+        linear-gradient(135deg, rgba(0, 184, 148, .15), transparent 34%),
+        linear-gradient(315deg, rgba(255, 95, 69, .12), transparent 30%),
         var(--bg);
       color: var(--ink);
       font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
@@ -73,7 +73,7 @@
       display: grid;
       place-items: center;
       border-radius: 8px;
-      background: #101820;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #ffffff;
       font-size: 13px;
       font-weight: 800;
@@ -111,7 +111,7 @@
 
     aside {
       border: 1px solid rgba(221, 229, 238, .88);
-      border-radius: 8px;
+      border-radius: 14px;
       background: rgba(255, 255, 255, .88);
       box-shadow: var(--shadow-soft);
       padding: 14px;
@@ -144,7 +144,7 @@
     input[type="file"], textarea, select {
       width: 100%;
       border: 1px solid var(--line-strong);
-      border-radius: 6px;
+      border-radius: 12px;
       background: rgba(255,255,255,.96);
       color: var(--ink);
       font: inherit;
@@ -167,7 +167,7 @@
     textarea:focus,
     select:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(15, 139, 141, .12);
+      box-shadow: 0 0 0 3px rgba(0, 184, 148, .15);
       background: #fff;
     }
 
@@ -177,15 +177,28 @@
       gap: 10px;
     }
 
+    .screen-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .screen-toolbar h2 {
+      margin: 0;
+    }
+
     .mode-tabs {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      grid-template-columns: repeat(2, minmax(76px, 1fr));
+      gap: 5px;
+      min-width: 174px;
       padding: 4px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f3f7fa;
-      margin: 2px 0 14px;
+      border: 1px solid rgba(0, 184, 148, .24);
+      border-radius: 999px;
+      background: #eafff8;
+      margin: 0;
     }
 
     .mode-tabs input {
@@ -197,20 +210,118 @@
     .mode-tabs label {
       display: grid;
       place-items: center;
-      min-height: 36px;
+      min-height: 34px;
       margin: 0;
-      border-radius: 6px;
-      color: var(--muted);
-      font-size: 13px;
+      border-radius: 999px;
+      color: var(--accent-dark);
+      font-size: 12px;
       font-weight: 760;
       cursor: pointer;
       transition: background .16s ease, color .16s ease, box-shadow .16s ease;
     }
 
     .mode-tabs input:checked + label {
-      background: #ffffff;
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 8px 18px rgba(0, 184, 148, .22);
+    }
+
+    input.file-input-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .drop-zone {
+      display: grid;
+      place-items: center;
+      gap: 9px;
+      min-height: 162px;
+      padding: 24px 18px;
+      border: 2px dashed rgba(0, 184, 148, .42);
+      border-radius: 22px;
+      background:
+        linear-gradient(135deg, rgba(0, 184, 148, .12), rgba(29, 122, 252, .07)),
+        #fbfffd;
+      text-align: center;
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      background:
+        linear-gradient(135deg, rgba(0, 184, 148, .18), rgba(29, 122, 252, .10)),
+        #ffffff;
+      box-shadow: 0 14px 28px rgba(0, 184, 148, .16);
+    }
+
+    .upload-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      font-size: 28px;
+      line-height: 1;
+      box-shadow: 0 10px 22px rgba(0, 184, 148, .28);
+    }
+
+    .upload-title {
       color: var(--ink);
-      box-shadow: 0 6px 14px rgba(22, 33, 52, .08);
+      font-size: 15px;
+      font-weight: 780;
+    }
+
+    .upload-subtitle,
+    .upload-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .upload-meta {
+      color: var(--accent-dark);
+      font-weight: 650;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .file-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 11px;
+      border: 1px solid rgba(0, 184, 148, .24);
+      border-radius: 12px;
+      background: #f2fffb;
+      color: var(--ink);
+      font-size: 12px;
+    }
+
+    .file-chip span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-chip small {
+      color: var(--muted);
+      white-space: nowrap;
     }
 
     .hint {
@@ -234,19 +345,19 @@
       width: 100%;
       margin-top: 12px;
       border: 1px solid transparent;
-      border-radius: 6px;
-      background: #101820;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #fff;
       font: inherit;
       font-weight: 650;
       cursor: pointer;
-      box-shadow: 0 8px 18px rgba(16, 24, 32, .12);
+      box-shadow: 0 10px 22px rgba(0, 184, 148, .18);
       transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
     }
 
     button:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 12px 24px rgba(16, 24, 32, .16);
+      box-shadow: 0 14px 28px rgba(0, 184, 148, .24);
     }
 
     button:active:not(:disabled) {
@@ -256,7 +367,7 @@
     button.secondary {
       background: #fff;
       color: var(--accent-dark);
-      border-color: #b8d6d1;
+      border-color: rgba(0, 184, 148, .28);
       box-shadow: none;
     }
 
@@ -270,7 +381,7 @@
       display: grid;
       grid-template-rows: auto 1fr;
       border: 1px solid rgba(221, 229, 238, .9);
-      border-radius: 8px;
+      border-radius: 16px;
       background: rgba(255,255,255,.70);
       box-shadow: var(--shadow);
       overflow: hidden;
@@ -294,7 +405,7 @@
       padding: 15px 16px;
       min-height: 82px;
       border: 1px solid rgba(221, 229, 238, .9);
-      border-radius: 8px;
+      border-radius: 14px;
       box-shadow: 0 5px 14px rgba(22, 33, 52, .04);
     }
 
@@ -338,7 +449,7 @@
       margin-bottom: 14px;
       padding: 8px;
       border: 1px solid rgba(221, 229, 238, .92);
-      border-radius: 8px;
+      border-radius: 16px;
       background: rgba(247, 250, 252, .92);
       backdrop-filter: blur(10px);
       box-shadow: 0 10px 24px rgba(22, 33, 52, .06);
@@ -381,7 +492,7 @@
       min-width: 0;
       padding: 18px;
       border: 1px solid rgba(221, 229, 238, .92);
-      border-radius: 8px;
+      border-radius: 16px;
       background: rgba(255,255,255,.86);
       box-shadow: var(--shadow-soft);
     }
@@ -509,7 +620,7 @@
       gap: 10px;
       padding: 30px;
       border: 1px dashed #b8c8d9;
-      border-radius: 8px;
+      border-radius: 16px;
       color: var(--muted);
       background: rgba(255,255,255,.8);
     }
@@ -526,7 +637,7 @@
       align-items: center;
       padding: 20px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 16px;
       background: #fff;
       box-shadow: var(--shadow-soft);
     }
@@ -563,7 +674,7 @@
 
     .panel {
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 14px;
       background: #fff;
       padding: 16px;
       min-width: 0;
@@ -619,7 +730,7 @@
 
     details {
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 14px;
       background: #fff;
       overflow: hidden;
     }
@@ -682,7 +793,7 @@
       padding: 18px;
       overflow: auto;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 14px;
       background: #111722;
       color: #d9e5ef;
       font: 13px/1.55 Consolas, "Courier New", monospace;
@@ -752,6 +863,15 @@
         max-height: none;
       }
 
+      .screen-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .mode-tabs {
+        width: 100%;
+      }
+
       .side-pane {
         border-left: 0;
       }
@@ -792,16 +912,25 @@
   <main>
     <aside>
       <section>
-        <h2>简历筛选</h2>
         <form id="screenForm">
-          <div class="mode-tabs">
-            <input id="screenSingle" type="radio" name="screen_mode" value="single" checked>
-            <label for="screenSingle">单份</label>
-            <input id="screenBatch" type="radio" name="screen_mode" value="batch">
-            <label for="screenBatch">批量</label>
+          <div class="screen-toolbar">
+            <h2>简历筛选</h2>
+            <div class="mode-tabs" aria-label="上传模式">
+              <input id="screenSingle" type="radio" name="screen_mode" value="single" checked>
+              <label for="screenSingle">单份上传</label>
+              <input id="screenBatch" type="radio" name="screen_mode" value="batch">
+              <label for="screenBatch">批量上传</label>
+            </div>
           </div>
-          <label for="screenFiles">文件</label>
-          <input id="screenFiles" name="files" type="file" accept=".txt,.md,.docx,.pdf,.csv,.jsonl" required>
+
+          <input id="screenFiles" class="file-input-hidden" name="files" type="file" accept=".txt,.md,.docx,.pdf,.csv,.jsonl">
+          <label id="dropZone" class="drop-zone" for="screenFiles">
+            <span class="upload-icon">+</span>
+            <span id="dropZoneTitle" class="upload-title">将简历拖到这里，或点击上传</span>
+            <span id="dropZoneSubtitle" class="upload-subtitle">支持 PDF、DOCX、TXT、MD、CSV、JSONL；单份模式会自动只取 1 份文件。</span>
+            <span id="dropZoneMeta" class="upload-meta">当前：单份上传</span>
+          </label>
+          <div id="selectedFiles" class="file-list" aria-live="polite"></div>
           <p id="screenHint" class="hint">单份模式会筛选 1 份简历并展示完整报告。</p>
           <div class="row">
             <div>
@@ -985,6 +1114,11 @@
     const screenFiles = document.querySelector('#screenFiles');
     const screenHint = document.querySelector('#screenHint');
     const screenSubmit = document.querySelector('#screenSubmit');
+    const dropZone = document.querySelector('#dropZone');
+    const dropZoneTitle = document.querySelector('#dropZoneTitle');
+    const dropZoneSubtitle = document.querySelector('#dropZoneSubtitle');
+    const dropZoneMeta = document.querySelector('#dropZoneMeta');
+    const selectedFiles = document.querySelector('#selectedFiles');
     const agentMode = document.querySelector('#agentMode');
     const agentModeHint = document.querySelector('#agentModeHint');
     const contentShell = document.querySelector('#contentShell');
@@ -1433,14 +1567,53 @@
       return document.querySelector('input[name="screen_mode"]:checked').value;
     }
 
+    function fileSizeLabel(bytes) {
+      if (!Number.isFinite(bytes)) return '';
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function renderSelectedFiles() {
+      const files = Array.from(screenFiles.files || []);
+      selectedFiles.innerHTML = files.map(file => `
+        <div class="file-chip">
+          <span title="${esc(file.name)}">${esc(file.name)}</span>
+          <small>${esc(fileSizeLabel(file.size))}</small>
+        </div>
+      `).join('');
+      if (files.length) {
+        dropZoneMeta.textContent = currentScreenMode() === 'batch'
+          ? `已选择 ${files.length} 份简历`
+          : `已选择：${files[0].name}`;
+      }
+    }
+
+    function setScreenFiles(files) {
+      const picked = Array.from(files || []);
+      const normalized = currentScreenMode() === 'batch' ? picked : picked.slice(0, 1);
+      const transfer = new DataTransfer();
+      normalized.forEach(file => transfer.items.add(file));
+      screenFiles.files = transfer.files;
+      renderSelectedFiles();
+    }
+
     function updateScreenMode() {
       const mode = currentScreenMode();
       screenFiles.multiple = mode === 'batch';
       screenFiles.value = '';
+      renderSelectedFiles();
       screenHint.textContent = mode === 'batch'
         ? '批量模式可一次选择多份简历，结果会按文件汇总。'
         : '单份模式会筛选 1 份简历并展示完整报告。';
       screenSubmit.textContent = mode === 'batch' ? '批量筛选' : '运行筛选';
+      dropZoneTitle.textContent = mode === 'batch'
+        ? '将多份简历拖到这里，或点击批量上传'
+        : '将简历拖到这里，或点击上传';
+      dropZoneSubtitle.textContent = mode === 'batch'
+        ? '批量上传可一次选择多份 PDF、DOCX、TXT、MD、CSV、JSONL 文件。'
+        : '支持 PDF、DOCX、TXT、MD、CSV、JSONL；单份模式会自动只取 1 份文件。';
+      dropZoneMeta.textContent = mode === 'batch' ? '当前：批量上传' : '当前：单份上传';
     }
 
     function updateAgentModeHint() {
@@ -1451,6 +1624,25 @@
 
     document.querySelectorAll('input[name="screen_mode"]').forEach(input => {
       input.addEventListener('change', updateScreenMode);
+    });
+    screenFiles.addEventListener('change', () => {
+      if (currentScreenMode() === 'single' && screenFiles.files.length > 1) {
+        setScreenFiles(Array.from(screenFiles.files).slice(0, 1));
+      } else {
+        renderSelectedFiles();
+      }
+    });
+    dropZone.addEventListener('dragover', event => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', event => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+      setScreenFiles(event.dataTransfer.files);
     });
     agentMode.addEventListener('change', updateAgentModeHint);
     document.querySelectorAll('[data-result-tab]').forEach(tab => {
