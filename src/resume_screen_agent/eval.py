@@ -205,7 +205,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run deterministic regression evals for the resume screen agent.")
     parser.add_argument("--cases", default=str(DEFAULT_EVAL_CASES), help="JSONL eval case file.")
     parser.add_argument("--out", default=str(ROOT / "results" / "agent_eval_report.json"), help="Output JSON report path.")
-    parser.add_argument("--redact", action="store_true", help="Redact basic personal info before workflow execution.")
+    parser.add_argument("--redact", action="store_true", help="Redact sensitive resume info before workflow execution.")
     args = parser.parse_args()
 
     report = run_eval_suite(cases_path=args.cases, out_path=args.out, redact=args.redact)

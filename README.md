@@ -11,7 +11,7 @@ AI Agent 开发工程师简历初筛 MVP。
 - 固定评分标准
 - 固定 JSON 输出
 - 人工复核标记
-- 简单个人信息脱敏
+- 增强隐私脱敏
 
 第一版不引入 LangChain / LangGraph。当前任务本质是文档读取、规则评分和 JSON 输出，普通 API 调用更稳。
 
@@ -29,6 +29,7 @@ resume-screen-agent/
     rag_system_prompt.md
     screening_system_prompt.md
     tool_agent_system_prompt.md
+  logs/
   standards/
     resume_screening_standard.md
   results/
@@ -59,6 +60,7 @@ resume-screen-agent/
     test_eval.py
     test_mcp_server.py
     test_rag.py
+    test_redact.py
     test_schema.py
     test_tool_agent.py
     test_web_app.py
@@ -96,10 +98,16 @@ BASE_URL=https://api.deepseek.com
 python scripts/screen_one.py --resume data/resumes/candidate.txt --out results/candidate.json
 ```
 
-如果想先做基本脱敏：
+如果想先做增强隐私脱敏：
 
 ```bash
 python scripts/screen_one.py --resume data/resumes/candidate.txt --out results/candidate.json --redact
+```
+
+`--redact` 会尽量遮住敏感值，同时保留技术能力证据。当前覆盖：
+
+```text
+姓名、手机号、邮箱、微信、身份证、地址、公司内部项目、学校、证书编号
 ```
 
 ## 批量初筛

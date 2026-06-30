@@ -913,7 +913,7 @@ def main() -> None:
     parser.add_argument("--resume", required=True, help="Path to resume file.")
     parser.add_argument("--screening-json", help="Optional existing screening JSON to normalize and verify.")
     parser.add_argument("--out", help="Output JSON path. If omitted, print to stdout.")
-    parser.add_argument("--redact", action="store_true", help="Redact basic personal info before tool calls.")
+    parser.add_argument("--redact", action="store_true", help="Redact sensitive resume info before tool calls.")
     parser.add_argument("--mode", choices=["fixed", "dynamic"], default="fixed", help="fixed keeps the old deterministic workflow; dynamic runs a planner/tool loop.")
     parser.add_argument("--llm-planner", action="store_true", help="Use the configured model to choose the next tool in dynamic mode.")
     parser.add_argument("--max-steps", type=int, default=12, help="Maximum planner/tool iterations in dynamic mode.")

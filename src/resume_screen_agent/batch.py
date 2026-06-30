@@ -123,7 +123,7 @@ def main() -> None:
     parser.add_argument("--jd", default=str(DEFAULT_JD), help="Path to JD text file.")
     parser.add_argument("--system-prompt", default=str(DEFAULT_SYSTEM_PROMPT), help="Path to system prompt file.")
     parser.add_argument("--standard", default=str(DEFAULT_STANDARD), help="Path to screening standard file.")
-    parser.add_argument("--redact", action="store_true", help="Redact basic personal info before sending to model.")
+    parser.add_argument("--redact", action="store_true", help="Redact sensitive resume info before sending to model.")
     parser.add_argument("--model", help="Override model name.")
     parser.add_argument("--base-url", help="Override OpenAI-compatible base URL.")
     args = parser.parse_args()
